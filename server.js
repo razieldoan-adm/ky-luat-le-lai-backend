@@ -35,8 +35,8 @@ app.use(express.json());
 
 
 //API cần sử dụng
-app.use('/violations', violationRoutes);
-app.use('/rules',ruleRoutes);
+app.use('/api/violations', violationRoutes);
+app.use('/api/rules',ruleRoutes);
 
 app.use('/api/classes',classRoutes);
 app.use('/api/settings',settingRoutes);
