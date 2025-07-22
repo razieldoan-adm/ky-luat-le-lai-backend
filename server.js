@@ -27,7 +27,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors({
-  origin: ['https://ten-frontend.vercel.app'],
+  origin: ['https://ky-luat-le-lai-frontend-bamm2mrdb-thaihuys-projects-3f253030.vercel.app'],
   credentials: true,
 }));
 
