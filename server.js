@@ -27,7 +27,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors({
-  origin: ['https://your-railway-app-production.up.railway.app'], // domain frontend vercel của bạn
+  origin: ['https://ky-luat-le-lai-frontend-m12iut4k5-thaihuys-projects-3f253030.vercel.app'], // domain frontend vercel của bạn
   credentials: true,
 }));
 app.use(express.json());
