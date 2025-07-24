@@ -63,7 +63,7 @@ app.use(express.static(path.join(__dirname, 'build'))); // nếu build frontend 
 app.get(['/dashboard', '/students', '/violations', '/settings'], (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
-});
+
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
  
