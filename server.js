@@ -54,6 +54,15 @@ app.use('/api/class-attendance-summaries', classAttendanceSummaryRoutes);
 app.use('/api/class-lineup-summaries', classLineupSummaryRoutes);
 app.use('/api/class-weekly-scores', classWeeklyScoreRoutes);
 app.use('/api/class-rank', emulationRoutes);
+
+// Serve static files from frontend build
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'build'))); // nếu build frontend vào /build
+
+// Catch-all route: serve index.html for all non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
  
