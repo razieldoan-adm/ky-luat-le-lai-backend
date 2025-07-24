@@ -24,6 +24,7 @@ const userRoutes = require('./routes/userRoutes');
 dotenv.config();
 
 const app = express();
+const path = require('path');
 const PORT = process.env.PORT || 5000;
 
 app.use(cors({
@@ -33,7 +34,7 @@ app.use(cors({
 
 app.use(express.json());
 
-
+app.use(express.static(path.join(__dirname, 'build')));
 //API cần sử dụng
 app.use('/api/violations', violationRoutes);
 app.use('/api/rules',ruleRoutes);
@@ -56,11 +57,9 @@ app.use('/api/class-weekly-scores', classWeeklyScoreRoutes);
 app.use('/api/class-rank', emulationRoutes);
 
 // Serve static files from frontend build
-const path = require('path');
-app.use(express.static(path.join(__dirname, 'build'))); // nếu build frontend vào /build
 
 // Catch-all route: serve index.html for all non-API routes
-app.get(['/dashboard', '/students', '/violations', '/settings'], (req, res) => {
+app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
