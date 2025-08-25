@@ -1,14 +1,14 @@
 const Class = require('../models/Class');
 const Violation = require('../models/Violation');
 
-// Thêm hoặc cập nhật GVCN cho lớp
 exports.createOrUpdateClass = async (req, res) => {
   try {
     const className = req.body.className?.toUpperCase()?.trim();
-    const teacher = req.body.teacher?.trim();
+    // teacher có thể rỗng
+    const teacher = req.body.teacher?.trim() || "";
 
-    if (!className || !teacher) {
-      return res.status(400).json({ error: 'Thiếu tên lớp hoặc GVCN' });
+    if (!className) {
+      return res.status(400).json({ error: 'Thiếu tên lớp' });
     }
 
     const updated = await Class.findOneAndUpdate(
