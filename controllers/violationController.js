@@ -3,23 +3,29 @@ const Rule = require('../models/Rule');
 const Setting = require('../models/Setting');
 const MeritScore = require('../models/MeritScore');
 
+// Helper chuẩn hóa tên (không phân biệt hoa/thường trong DB)
+const normalizeName = (name) => name?.trim().toLowerCase();
+
 // Cập nhật điểm hạnh kiểm vào collection riêng
 const updateMeritScore = async (studentName, className) => {
+  const name = normalizeName(studentName);
   const settings = await Setting.findOne();
-  const allViolations = await Violation.find({ name: studentName, className });
+
+  const allViolations = await Violation.find({ name, className })
+    .collation({ locale: 'en', strength: 2 });
 
   const totalPenalty = allViolations.reduce((sum, v) => sum + (v.penalty || 0), 0);
   const maxMerit = settings?.maxMeritScore || 100;
   const meritScore = Math.max(maxMerit - totalPenalty, 0);
 
   await MeritScore.findOneAndUpdate(
-    { name: studentName, className },
+    { name, className },
     { score: meritScore, timestamp: new Date() },
     { upsert: true }
   );
 };
 
-// Tìm học sinh có tên gần giống (không phân biệt hoa thường)
+// 🔎 Tìm học sinh có tên gần giống (không phân biệt hoa/thường)
 exports.searchViolations = async (req, res) => {
   const { name } = req.query;
   if (!name) return res.status(400).json({ error: 'Missing name' });
@@ -27,8 +33,8 @@ exports.searchViolations = async (req, res) => {
   try {
     const regex = new RegExp(name, 'i');
     const matches = await Violation.find({ name: regex }).distinct('name');
-    const results = [];
 
+    const results = [];
     for (const matchedName of matches) {
       const v = await Violation.findOne({ name: matchedName });
       results.push({ name: v.name, className: v.className });
@@ -40,25 +46,27 @@ exports.searchViolations = async (req, res) => {
   }
 };
 
-// Lấy vi phạm theo học sinh
+// 📌 Lấy vi phạm theo học sinh
 exports.getViolationsByStudent = async (req, res) => {
-  const { name } = req.params;
   const { className } = req.query;
+  const name = normalizeName(req.params.name);
 
   try {
-    const violations = await Violation.find({ name, className });
+    const violations = await Violation.find({ name, className })
+      .collation({ locale: 'en', strength: 2 });
     res.json(violations);
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 };
 
-// Ghi nhận vi phạm mới (lưu cả weekNumber)
+// ➕ Ghi nhận vi phạm mới (lưu cả weekNumber)
 exports.createViolation = async (req, res) => {
-  const { name, className, description, handlingMethod, weekNumber } = req.body;
+  const { className, description, handlingMethod, weekNumber } = req.body;
+  const name = normalizeName(req.body.name);
 
   try {
-    const rule = await Rule.findOne({ title: description }); // ✅ đúng field title
+    const rule = await Rule.findOne({ title: description });
     const penalty = rule ? rule.point : 0;
 
     const violation = new Violation({
@@ -67,7 +75,7 @@ exports.createViolation = async (req, res) => {
       description,
       penalty,
       handlingMethod,
-      week: weekNumber // ✅ lưu weekNumber vào field week
+      week: weekNumber
     });
 
     await violation.save();
@@ -80,7 +88,7 @@ exports.createViolation = async (req, res) => {
   }
 };
 
-// Xử lý vi phạm (cập nhật handled + handlingMethod)
+// 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
 exports.handleViolation = async (req, res) => {
   const { id } = req.params;
   const { handled, handlingMethod } = req.body;
@@ -102,7 +110,7 @@ exports.handleViolation = async (req, res) => {
   }
 };
 
-// Đánh dấu vi phạm đã xử lý
+// ✅ Đánh dấu vi phạm đã xử lý
 exports.markViolationHandled = async (req, res) => {
   const { id } = req.params;
 
@@ -123,7 +131,7 @@ exports.markViolationHandled = async (req, res) => {
   }
 };
 
-// Xoá vi phạm
+// ❌ Xoá vi phạm
 exports.deleteViolation = async (req, res) => {
   try {
     const { id } = req.params;
@@ -141,7 +149,7 @@ exports.deleteViolation = async (req, res) => {
   }
 };
 
-// Lấy danh sách học sinh có lỗi chưa xử lý (gộp theo name + className)
+// 🔔 Lấy danh sách học sinh có lỗi chưa xử lý (gộp theo name + className)
 exports.getUnhandledViolationStudents = async (req, res) => {
   try {
     const unhandled = await Violation.aggregate([
@@ -160,7 +168,7 @@ exports.getUnhandledViolationStudents = async (req, res) => {
           count: 1
         }
       }
-    ]);
+    ]).collation({ locale: 'en', strength: 2 });
 
     res.json(unhandled);
   } catch (err) {
@@ -168,7 +176,7 @@ exports.getUnhandledViolationStudents = async (req, res) => {
   }
 };
 
-// Lấy toàn bộ vi phạm (dành cho trang admin hoặc tổng hợp)
+// 📊 Lấy toàn bộ vi phạm
 exports.getAllViolationStudents = async (req, res) => {
   try {
     const violations = await Violation.find().sort({ time: -1 });
@@ -178,6 +186,7 @@ exports.getAllViolationStudents = async (req, res) => {
   }
 };
 
+// 📌 Tổng số vi phạm
 exports.getViolationCount = async (req, res) => {
   try {
     const count = await Violation.countDocuments();
@@ -187,6 +196,7 @@ exports.getViolationCount = async (req, res) => {
   }
 };
 
+// 📌 Số vi phạm chưa xử lý
 exports.getUnhandledViolationCount = async (req, res) => {
   try {
     const count = await Violation.countDocuments({ handled: false });
@@ -196,6 +206,7 @@ exports.getUnhandledViolationCount = async (req, res) => {
   }
 };
 
+// 📌 Đếm học sinh vi phạm >= 3 lần
 exports.countMultipleViolations = async (req, res) => {
   try {
     const result = await Violation.aggregate([
@@ -207,7 +218,7 @@ exports.countMultipleViolations = async (req, res) => {
       },
       { $match: { count: { $gte: 3 } } },
       { $count: "count" }
-    ]);
+    ]).collation({ locale: 'en', strength: 2 });
 
     res.json({ count: result[0]?.count || 0 });
   } catch (err) {
