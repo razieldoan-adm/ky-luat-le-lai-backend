@@ -29,7 +29,7 @@ exports.calculateTotalRank = async (req, res) => {
       s.totalViolation = s.academicScore + s.disciplineScore + s.hygieneScore + s.attendanceScore + s.lineUpScore;
     });
     grouped[grade].forEach(s => {
-      s.totalScore = s.academicScore + s.totalViolation;
+      s.totalScore = s.academicScore + s.totalViolation s.bonusScore;
     });
     grouped[grade].sort((a, b) => b.totalScore - a.totalScore);
     grouped[grade].forEach((s, i) => { s.rank = i + 1; });
