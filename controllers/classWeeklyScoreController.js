@@ -26,7 +26,10 @@ exports.calculateTotalRank = async (req, res) => {
 
   for (const grade in grouped) {
     grouped[grade].forEach(s => {
-      s.totalScore = s.academicScore + s.disciplineScore + s.hygieneScore + s.attendanceScore + s.lineUpScore;
+      s.totalViolation = s.academicScore + s.disciplineScore + s.hygieneScore + s.attendanceScore + s.lineUpScore;
+    });
+    grouped[grade].forEach(s => {
+      s.totalScore = s.academicScore + s.totalViolation;
     });
     grouped[grade].sort((a, b) => b.totalScore - a.totalScore);
     grouped[grade].forEach((s, i) => { s.rank = i + 1; });
