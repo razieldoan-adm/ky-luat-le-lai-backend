@@ -75,7 +75,7 @@ exports.createViolation = async (req, res) => {
       description,
       penalty,
       handlingMethod,
-      week: weekNumber
+      weekNumber: weekNumber
     });
 
     await violation.save();
