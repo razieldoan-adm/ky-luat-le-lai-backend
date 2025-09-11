@@ -1,60 +1,40 @@
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
-const { calculateWeeklyScores } = require('../services/calculateWeeklyScores');
 
-exports.getWeeklyScores = async (req, res) => {
+// 📌 Save mới
+exports.saveScore = async (req, res) => {
   try {
-    const { weekNumber } = req.query;
+    const { className, grade, weekNumber, academicScore, hygieneScore, attendanceScore, lineUpScore } = req.body;
 
-    if (!weekNumber) {
-      return res.status(400).json({ message: 'Thiếu weekNumber.' });
-    }
-
-    const scores = await ClassWeeklyScore.find({ weekNumber }).sort({ grade: 1, rank: 1 });
-    res.json(scores);
-  } catch (err) {
-    console.error('❌ Lỗi khi lấy weekly scores:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-
-exports.calculateWeeklyScores = async (req, res) => {
-  const { weekNumber } = req.body;
-  const data = await calculateWeeklyScores(weekNumber);
-  res.json(data);
-};
-
-exports.calculateTotalRank = async (req, res) => {
-  const { weekNumber } = req.body;
-  const scores = await ClassWeeklyScore.find({ weekNumber });
-
-  // Tính totalScore và rank theo khối
-  const grouped = {};
-  scores.forEach(s => {
-    if (!grouped[s.grade]) grouped[s.grade] = [];
-    grouped[s.grade].push(s);
-  });
-
-  for (const grade in grouped) {
-    grouped[grade].forEach(s => {
-      s.totalScore = s.academicScore + s.disciplineScore + s.hygieneScore + s.attendanceScore + s.lineUpScore;
+    const newScore = new ClassWeeklyScore({
+      className,
+      grade,
+      weekNumber,
+      academicScore,
+      hygieneScore,
+      attendanceScore,
+      lineUpScore,
     });
-    grouped[grade].sort((a, b) => b.totalScore - a.totalScore);
-    grouped[grade].forEach((s, i) => { s.rank = i + 1; });
-  }
 
-  await Promise.all(scores.map(s => s.save()));
-  res.json(scores);
+    await newScore.save();
+    res.status(201).json(newScore);
+  } catch (err) {
+    console.error('Lỗi khi lưu score:', err);
+    res.status(500).json({ error: 'Lỗi server khi lưu score' });
+  }
 };
 
-exports.saveWeeklyScores = async (req, res) => {
-  const { weekNumber, scores } = req.body;
-  await Promise.all(scores.map(async (s) => {
-    await ClassWeeklyScore.updateOne(
-      { className: s.className, weekNumber },
-      { ...s, weekNumber },
-      { upsert: true }
-    );
-  }));
-  res.json({ message: 'Saved' });
+// 📌 Update lại
+exports.updateScore = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const updated = await ClassWeeklyScore.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+    if (!updated) return res.status(404).json({ error: 'Không tìm thấy dữ liệu' });
+
+    res.json(updated);
+  } catch (err) {
+    console.error('Lỗi khi update score:', err);
+    res.status(500).json({ error: 'Lỗi server khi update score' });
+  }
 };
