@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getWeeklyScores } = require('../controllers/classWeeklyScoreController');
+const weeklyScoresController = require('../controllers/classWeeklyScoreController');
 
-router.get('/week/:weekNumber', getWeeklyScores);
+router.get('/', weeklyScoresController.getWeeklyScores);
+router.post('/', weeklyScoresController.saveWeeklyScores);
+router.post('/calculate', weeklyScoresController.calculateWeeklyScores);
+router.post('/calculate-total-rank', weeklyScoresController.calculateTotalRank);
 
 module.exports = router;
