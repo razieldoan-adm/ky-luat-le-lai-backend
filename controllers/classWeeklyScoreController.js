@@ -1,65 +1,49 @@
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
-const Setting = require('../models/Setting');
+const { calculateWeeklyScores } = require('../services/calculateWeeklyScores');
 
-// Lấy điểm thi đua theo tuần
-const getWeeklyScores = async (req, res) => {
-  try {
-    const { weekNumber } = req.params;
-
-    // Lấy cấu hình từ settings
-    const settings = await Setting.findOne();
-    if (!settings) {
-      return res.status(400).json({ message: 'Chưa có cấu hình hệ thống' });
-    }
-
-    const classes = await ClassWeeklyScore.find({ weekNumber });
-
-    // Gom theo khối (grade)
-    const grouped = {};
-    classes.forEach(cls => {
-      const totalViolation =
-        (cls.violationScore || 0) +
-        (cls.cleanlinessScore || 0) +
-        (cls.attendanceScore || 0) +
-        (cls.lineScore || 0);
-
-      // ✅ Công thức mới
-      const totalDiscipline = settings.maxDisciplineScore - totalViolation;
-      const finalScore =
-        (cls.bonusScore || 0) +
-        (cls.academicScore || 0) +
-        totalDiscipline;
-
-      // Gắn vào object
-      if (!grouped[cls.grade]) grouped[cls.grade] = [];
-      grouped[cls.grade].push({
-        className: cls.className,
-        grade: cls.grade,
-        academicScore: cls.academicScore,
-        bonusScore: cls.bonusScore,
-        violationScore: cls.violationScore,
-        cleanlinessScore: cls.cleanlinessScore,
-        attendanceScore: cls.attendanceScore,
-        lineScore: cls.lineScore,
-        totalDiscipline,
-        finalScore,
-      });
-    });
-
-    // ✅ Xếp hạng trong từng khối
-    Object.keys(grouped).forEach(grade => {
-      grouped[grade]
-        .sort((a, b) => b.finalScore - a.finalScore)
-        .forEach((cls, index) => {
-          cls.rank = index + 1;
-        });
-    });
-
-    res.json(grouped);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Lỗi lấy điểm tuần', error });
-  }
+exports.getWeeklyScores = async (req, res) => {
+  const { weekNumber } = req.query;
+  const scores = await ClassWeeklyScore.find({ weekNumber });
+  res.json(scores);
 };
 
-module.exports = { getWeeklyScores };
+exports.calculateWeeklyScores = async (req, res) => {
+  const { weekNumber } = req.body;
+  const data = await calculateWeeklyScores(weekNumber);
+  res.json(data);
+};
+
+exports.calculateTotalRank = async (req, res) => {
+  const { weekNumber } = req.body;
+  const scores = await ClassWeeklyScore.find({ weekNumber });
+
+  // Tính totalScore và rank theo khối
+  const grouped = {};
+  scores.forEach(s => {
+    if (!grouped[s.grade]) grouped[s.grade] = [];
+    grouped[s.grade].push(s);
+  });
+
+  for (const grade in grouped) {
+    grouped[grade].forEach(s => {
+      s.totalScore = s.academicScore + s.disciplineScore + s.hygieneScore + s.attendanceScore + s.lineUpScore;
+    });
+    grouped[grade].sort((a, b) => b.totalScore - a.totalScore);
+    grouped[grade].forEach((s, i) => { s.rank = i + 1; });
+  }
+
+  await Promise.all(scores.map(s => s.save()));
+  res.json(scores);
+};
+
+exports.saveWeeklyScores = async (req, res) => {
+  const { weekNumber, scores } = req.body;
+  await Promise.all(scores.map(async (s) => {
+    await ClassWeeklyScore.updateOne(
+      { className: s.className, weekNumber },
+      { ...s, weekNumber },
+      { upsert: true }
+    );
+  }));
+  res.json({ message: 'Saved' });
+};
