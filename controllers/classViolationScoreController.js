@@ -54,3 +54,14 @@ exports.getClassViolationScore = async (req, res) => {
     res.status(500).json({ message: 'Server error.' });
   }
 };
+
+exports.getByWeek = async (req, res) => {
+  try {
+    const { weekNumber } = req.query;
+    const scores = await ClassViolationScore.find({ weekNumber });
+    res.json(scores);
+  } catch (err) {
+    console.error("Lỗi lấy violation scores:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
