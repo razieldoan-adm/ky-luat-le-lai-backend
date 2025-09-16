@@ -47,7 +47,6 @@ exports.getByWeekAndClass = async (req, res) => {
       weekNumber: Number(weekNumber),
       className
     });
-
     res.json(summaries);
   } catch (err) {
     console.error('❌ Lỗi getByWeekAndClass (Attendance):', err);
