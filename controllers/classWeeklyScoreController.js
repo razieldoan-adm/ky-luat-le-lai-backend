@@ -1,8 +1,11 @@
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
-const { calculateWeeklyScores } = require('../services/calculateWeeklyScores');
+const Attendance = require('../models/ClassAttendanceSummary');
+const Hygiene = require('../models/ClassHygieneScore');
+const Lineup = require('../models/ClassLineupSummary');
+const Violation = require('../models/ClassViolationScore');
 
 /**
- * Lấy dữ liệu điểm theo tuần
+ * Lấy dữ liệu đã lưu của tuần (sau khi người dùng Save)
  */
 exports.getWeeklyScores = async (req, res) => {
   try {
@@ -20,92 +23,57 @@ exports.getWeeklyScores = async (req, res) => {
 };
 
 /**
- * Tính điểm tuần và lưu vào DB
+ * Lấy dữ liệu thô cho tuần (chưa tính toán, chưa nhập học tập/thưởng)
  */
-exports.calculateWeeklyScores = async (req, res) => {
+exports.getTempWeeklyScores = async (req, res) => {
   try {
-    const { weekNumber } = req.body;
+    const { weekNumber } = req.query;
     if (!weekNumber) {
       return res.status(400).json({ message: "Missing weekNumber" });
     }
 
-    // Tính toán điểm từ service
-    const data = await calculateWeeklyScores(weekNumber);
+    const [attendance, hygiene, lineup, violation] = await Promise.all([
+      Attendance.find({ weekNumber }),
+      Hygiene.find({ weekNumber }),
+      Lineup.find({ weekNumber }),
+      Violation.find({ weekNumber }),
+    ]);
 
-    // Lưu vào DB
-    await Promise.all(data.map(async (s) => {
-      await ClassWeeklyScore.updateOne(
-        { className: s.className, weekNumber },
-        { ...s, weekNumber },
-        { upsert: true }
-      );
-    }));
+    const result = {};
+    [...attendance, ...hygiene, ...lineup, ...violation].forEach(item => {
+      const cls = item.className;
+      if (!result[cls]) {
+        result[cls] = {
+          className: cls,
+          grade: item.grade,
+          attendanceScore: 0,
+          hygieneScore: 0,
+          lineupScore: 0,
+          violationScore: 0,
+          academicScore: 0,
+          bonusScore: 0,
+        };
+      }
 
-    res.json(data);
-  } catch (err) {
-    console.error("Error in calculateWeeklyScores:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
- * Tính tổng điểm & xếp hạng theo khối
- */
-exports.calculateTotalRank = async (req, res) => {
-  try {
-    const { weekNumber } = req.body;
-    if (!weekNumber) {
-      return res.status(400).json({ message: "Missing weekNumber" });
-    }
-
-    const scores = await ClassWeeklyScore.find({ weekNumber });
-
-    // Gom theo khối
-    const grouped = {};
-    scores.forEach(s => {
-      if (!grouped[s.grade]) grouped[s.grade] = [];
-      grouped[s.grade].push(s);
+      if (item.attendanceScore !== undefined)
+        result[cls].attendanceScore = item.attendanceScore;
+      if (item.hygieneScore !== undefined)
+        result[cls].hygieneScore = item.hygieneScore;
+      if (item.lineupScore !== undefined)
+        result[cls].lineupScore = item.lineupScore;
+      if (item.violationScore !== undefined)
+        result[cls].violationScore = item.violationScore;
     });
 
-    // Tính totalViolation và totalRankScore
-    for (const grade in grouped) {
-      grouped[grade].forEach(s => {
-        // totalViolation = disciplineMax - (các vi phạm)
-        s.totalViolation =
-          (s.disciplineMax || 0) -
-          ((s.disciplineScore || 0) +
-            (s.hygieneScore || 0) +
-            (s.attendanceScore || 0) +
-            (s.lineUpScore || 0));
-
-        // totalRankScore = điểm học tập + thưởng + còn lại
-        s.totalRankScore =
-          (s.academicScore || 0) +
-          (s.bonusScore || 0) +
-          s.totalViolation;
-      });
-
-      // Sắp xếp theo totalRankScore giảm dần
-      grouped[grade].sort((a, b) => b.totalRankScore - a.totalRankScore);
-
-      // Gán rank
-      grouped[grade].forEach((s, i) => {
-        s.rank = i + 1;
-      });
-    }
-
-    // Lưu lại DB
-    await Promise.all(scores.map(s => s.save()));
-
-    res.json(scores);
+    res.json(Object.values(result));
   } catch (err) {
-    console.error("Error in calculateTotalRank:", err);
+    console.error("Error in getTempWeeklyScores:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
 /**
- * Lưu thủ công điểm tuần
+ * Lưu điểm tuần (sau khi frontend đã tính toán xong)
  */
 exports.saveWeeklyScores = async (req, res) => {
   try {
@@ -114,15 +82,17 @@ exports.saveWeeklyScores = async (req, res) => {
       return res.status(400).json({ message: "Missing data" });
     }
 
-    await Promise.all(scores.map(async (s) => {
-      await ClassWeeklyScore.updateOne(
-        { className: s.className, weekNumber },
-        { ...s, weekNumber },
-        { upsert: true }
-      );
-    }));
+    await Promise.all(
+      scores.map(async (s) => {
+        await ClassWeeklyScore.updateOne(
+          { className: s.className, weekNumber },
+          { ...s, weekNumber },
+          { upsert: true }
+        );
+      })
+    );
 
-    res.json({ message: 'Saved' });
+    res.json({ message: "Saved" });
   } catch (err) {
     console.error("Error in saveWeeklyScores:", err);
     res.status(500).json({ message: "Server error" });
