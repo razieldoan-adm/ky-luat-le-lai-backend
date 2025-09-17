@@ -32,11 +32,14 @@ exports.getTempWeeklyScores = async (req, res) => {
       return res.status(400).json({ message: "Missing weekNumber" });
     }
 
-    const [attendance, hygiene, lineup, violation] = await Promise.all([
-      Attendance.find({ weekNumber }),
-      Hygiene.find({ weekNumber }),
-      Lineup.find({ weekNumber }),
-      Violation.find({ weekNumber }),
+    const week = parseInt(weekNumber, 10);
+
+    const [attendance, hygiene, lineup, violation, settings] = await Promise.all([
+      Attendance.find({ weekNumber: week }),
+      Hygiene.find({ weekNumber: week }),
+      Lineup.find({ weekNumber: week }),
+      Violation.find({ weekNumber: week }),
+      Setting.findOne({}),
     ]);
 
     const result = {};
@@ -46,24 +49,36 @@ exports.getTempWeeklyScores = async (req, res) => {
         result[cls] = {
           className: cls,
           grade: item.grade,
+          weekNumber: week,
           attendanceScore: 0,
           hygieneScore: 0,
           lineupScore: 0,
           violationScore: 0,
           academicScore: 0,
           bonusScore: 0,
+          totalViolation: 0,
+          totalScore: 0,
         };
       }
 
       if (item.attendanceScore !== undefined)
-        result[cls].attendanceScore = item.attendanceScore;
+        result[cls].attendanceScore += item.attendanceScore;
       if (item.hygieneScore !== undefined)
-        result[cls].hygieneScore = item.hygieneScore;
+        result[cls].hygieneScore += item.hygieneScore;
       if (item.lineupScore !== undefined)
-        result[cls].lineupScore = item.lineupScore;
+        result[cls].lineupScore += item.lineupScore;
       if (item.violationScore !== undefined)
-        result[cls].violationScore = item.violationScore;
+        result[cls].violationScore += item.violationScore;
     });
+
+    // Tính điểm cuối cùng
+    const disciplineMax = settings?.disciplineMax ?? 100;
+    for (const cls of Object.values(result)) {
+      cls.totalViolation = disciplineMax
+        - (cls.attendanceScore + cls.hygieneScore + cls.lineupScore + cls.violationScore);
+
+      cls.totalScore = cls.academicScore + cls.bonusScore + cls.totalViolation;
+    }
 
     res.json(Object.values(result));
   } catch (err) {
@@ -71,6 +86,7 @@ exports.getTempWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /**
  * Lưu điểm tuần (sau khi frontend đã tính toán xong)
