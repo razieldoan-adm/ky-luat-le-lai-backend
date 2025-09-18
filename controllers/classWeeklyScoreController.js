@@ -3,7 +3,7 @@ const Attendance = require('../models/ClassAttendanceSummary');
 const Hygiene = require('../models/ClassHygieneScore');
 const Lineup = require('../models/ClassLineupSummary');
 const Violation = require('../models/ClassViolationScore');
-
+const Setting = require('../models/Setting');
 /**
  * Lấy dữ liệu đã lưu của tuần (sau khi người dùng Save)
  */
