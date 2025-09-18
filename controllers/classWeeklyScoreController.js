@@ -1,7 +1,7 @@
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
 const Attendance = require('../models/ClassAttendanceSummary');
 const Hygiene = require('../models/ClassHygieneScore');
-const Lineup = require('../models/ClassLineupSummary');
+const Lineup = require('../models/ClassLineUpSummary');
 const Violation = require('../models/ClassViolationScore');
 const Setting = require('../models/Setting');
 /**
