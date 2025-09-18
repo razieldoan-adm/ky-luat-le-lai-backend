@@ -88,7 +88,7 @@ exports.getTempWeeklyScores = async (req, res) => {
 
     let scores = Object.values(result);
 
-    // Bổ sung logic xếp hạng
+    // Xếp hạng theo tổng điểm
     scores = addRanking(scores);
 
     res.json(scores);
@@ -97,6 +97,7 @@ exports.getTempWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 
 /**
