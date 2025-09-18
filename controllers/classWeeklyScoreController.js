@@ -4,6 +4,7 @@ const Hygiene = require('../models/ClassHygieneScore');
 const Lineup = require('../models/ClassLineUpSummary');
 const Violation = require('../models/ClassViolationScore');
 const Setting = require('../models/Setting');
+
 /**
  * Lấy dữ liệu đã lưu của tuần (sau khi người dùng Save)
  */
@@ -14,7 +15,11 @@ exports.getWeeklyScores = async (req, res) => {
       return res.status(400).json({ message: "Missing weekNumber" });
     }
 
-    const scores = await ClassWeeklyScore.find({ weekNumber });
+    let scores = await ClassWeeklyScore.find({ weekNumber }).lean();
+
+    // Bổ sung logic xếp hạng
+    scores = addRanking(scores);
+
     res.json(scores);
   } catch (err) {
     console.error("Error in getWeeklyScores:", err);
@@ -58,6 +63,7 @@ exports.getTempWeeklyScores = async (req, res) => {
           bonusScore: 0,
           totalViolation: 0,
           totalScore: 0,
+          ranking: 0,
         };
       }
 
@@ -80,7 +86,12 @@ exports.getTempWeeklyScores = async (req, res) => {
       cls.totalScore = cls.academicScore + cls.bonusScore + cls.totalViolation;
     }
 
-    res.json(Object.values(result));
+    let scores = Object.values(result);
+
+    // Bổ sung logic xếp hạng
+    scores = addRanking(scores);
+
+    res.json(scores);
   } catch (err) {
     console.error("Error in getTempWeeklyScores:", err);
     res.status(500).json({ message: "Server error" });
@@ -114,3 +125,27 @@ exports.saveWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+/**
+ * Hàm phụ: Thêm xếp hạng vào danh sách điểm
+ */
+function addRanking(scores) {
+  // Sắp xếp theo tổng điểm giảm dần
+  scores.sort((a, b) => b.totalScore - a.totalScore);
+
+  let currentRank = 0;
+  let lastScore = null;
+  let count = 0;
+
+  scores.forEach((s) => {
+    count++;
+    if (s.totalScore !== lastScore) {
+      currentRank = count;
+      lastScore = s.totalScore;
+    }
+    s.ranking = currentRank;
+  });
+
+  return scores;
+}
