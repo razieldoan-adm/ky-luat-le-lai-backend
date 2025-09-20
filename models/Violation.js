@@ -18,10 +18,6 @@ const violationSchema = new mongoose.Schema({
   handled: {
     type: Boolean,
     default: false,
-  },
-  handled: {
-    type: Boolean,
-    default: false,
   }
 });
 
