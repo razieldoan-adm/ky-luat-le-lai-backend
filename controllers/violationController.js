@@ -62,7 +62,7 @@ exports.getViolationsByStudent = async (req, res) => {
 
 // ➕ Ghi nhận vi phạm mới (lưu cả weekNumber)
 exports.createViolation = async (req, res) => {
-  const { className, description, handlingMethod, weekNumber } = req.body;
+  const { className, description, handlingMethod, weekNumber, time } = req.body;
   const name = normalizeName(req.body.name);
 
   try {
