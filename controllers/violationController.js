@@ -75,7 +75,7 @@ exports.createViolation = async (req, res) => {
       description,
       penalty,
       handlingMethod,
-      weekNumber: weekNumber
+      weekNumber: weekNumber,
       time: time ? new Date(time) : new Date()
     });
 
