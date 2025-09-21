@@ -98,10 +98,8 @@ exports.getTempWeeklyScores = async (req, res) => {
   }
 };
 
-
-
 /**
- * Lưu điểm tuần (sau khi frontend đã tính toán xong)
+ * Lưu điểm tuần (lần đầu lưu sau khi frontend tính toán xong)
  */
 exports.saveWeeklyScores = async (req, res) => {
   try {
@@ -127,12 +125,39 @@ exports.saveWeeklyScores = async (req, res) => {
   }
 };
 
+/**
+ * Cập nhật lại điểm tuần (sau khi chỉnh sửa/thêm mới)
+ */
+exports.updateWeeklyScores = async (req, res) => {
+  try {
+    const { weekNumber } = req.params;
+    const { scores } = req.body;
+
+    if (!weekNumber || !scores) {
+      return res.status(400).json({ message: "Missing data" });
+    }
+
+    await Promise.all(
+      scores.map(async (s) => {
+        await ClassWeeklyScore.updateOne(
+          { className: s.className, weekNumber },
+          { ...s, weekNumber },
+          { upsert: true }
+        );
+      })
+    );
+
+    res.json({ message: "Updated" });
+  } catch (err) {
+    console.error("Error in updateWeeklyScores:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 /**
  * Hàm phụ: Thêm xếp hạng vào danh sách điểm
  */
 function addRanking(scores) {
-  // Sắp xếp theo tổng điểm giảm dần
   scores.sort((a, b) => b.totalScore - a.totalScore);
 
   let currentRank = 0;
