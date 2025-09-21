@@ -47,6 +47,8 @@ exports.getTempWeeklyScores = async (req, res) => {
       Setting.findOne({}),
     ]);
 
+    const disciplineMax = settings?.disciplineMax ?? 100;
+
     const result = {};
     [...attendance, ...hygiene, ...lineup, ...violation].forEach(item => {
       const cls = item.className;
@@ -78,7 +80,6 @@ exports.getTempWeeklyScores = async (req, res) => {
     });
 
     // Tính điểm cuối cùng
-    const disciplineMax = settings?.disciplineMax ?? 100;
     for (const cls of Object.values(result)) {
       cls.totalViolation = disciplineMax
         - (cls.attendanceScore + cls.hygieneScore + cls.lineupScore + cls.violationScore);
@@ -86,7 +87,21 @@ exports.getTempWeeklyScores = async (req, res) => {
       cls.totalScore = cls.academicScore + cls.bonusScore + cls.totalViolation;
     }
 
-    let scores = Object.values(result);
+    // Chuẩn hóa dữ liệu trước khi trả ra
+    let scores = Object.values(result).map(s => ({
+      className: s.className,
+      grade: s.grade,
+      weekNumber: s.weekNumber,
+      attendanceScore: s.attendanceScore ?? 0,
+      hygieneScore: s.hygieneScore ?? 0,
+      lineupScore: s.lineupScore ?? 0,
+      violationScore: s.violationScore ?? 0,
+      academicScore: s.academicScore ?? 0,
+      bonusScore: s.bonusScore ?? 0,
+      totalViolation: s.totalViolation ?? 0,
+      totalScore: s.totalScore ?? 0,
+      ranking: s.ranking ?? 0,
+    }));
 
     // Xếp hạng theo tổng điểm
     scores = addRanking(scores);
@@ -99,7 +114,7 @@ exports.getTempWeeklyScores = async (req, res) => {
 };
 
 /**
- * Lưu điểm tuần (lần đầu lưu sau khi frontend tính toán xong)
+ * Lưu điểm tuần (sau khi frontend đã tính toán xong)
  */
 exports.saveWeeklyScores = async (req, res) => {
   try {
@@ -126,7 +141,7 @@ exports.saveWeeklyScores = async (req, res) => {
 };
 
 /**
- * Cập nhật lại điểm tuần (sau khi chỉnh sửa/thêm mới)
+ * Cập nhật điểm tuần (sau khi đã có dữ liệu trước đó)
  */
 exports.updateWeeklyScores = async (req, res) => {
   try {
@@ -158,6 +173,7 @@ exports.updateWeeklyScores = async (req, res) => {
  * Hàm phụ: Thêm xếp hạng vào danh sách điểm
  */
 function addRanking(scores) {
+  // Sắp xếp theo tổng điểm giảm dần
   scores.sort((a, b) => b.totalScore - a.totalScore);
 
   let currentRank = 0;
