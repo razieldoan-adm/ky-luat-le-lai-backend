@@ -50,6 +50,7 @@ exports.getTempWeeklyScores = async (req, res) => {
     const disciplineMax = settings?.disciplineMax ?? 100;
 
     const result = {};
+
     [...attendance, ...hygiene, ...lineup, ...violation].forEach(item => {
       const cls = item.className;
       if (!result[cls]) {
@@ -59,7 +60,7 @@ exports.getTempWeeklyScores = async (req, res) => {
           weekNumber: week,
           attendanceScore: 0,
           hygieneScore: 0,
-          lineupScore: 0,
+          lineUpScore: 0,
           violationScore: 0,
           academicScore: 0,
           bonusScore: 0,
@@ -69,32 +70,37 @@ exports.getTempWeeklyScores = async (req, res) => {
         };
       }
 
-      if (item.attendanceScore !== undefined)
-        result[cls].attendanceScore += item.attendanceScore;
-      if (item.hygieneScore !== undefined)
-        result[cls].hygieneScore += item.hygieneScore;
-      if (item.lineupScore !== undefined)
-        result[cls].lineupScore += item.lineupScore;
-      if (item.violationScore !== undefined)
-        result[cls].violationScore += item.violationScore;
+      // Gán đúng điểm theo từng model
+      if (item.constructor.modelName === 'ClassAttendanceSummary')
+        result[cls].attendanceScore += item.score ?? 0;
+
+      if (item.constructor.modelName === 'ClassHygieneScore')
+        result[cls].hygieneScore += item.score ?? 0;
+
+      if (item.constructor.modelName === 'ClassLineUpSummary')
+        result[cls].lineUpScore += item.score ?? 0;
+
+      if (item.constructor.modelName === 'ClassViolationScore')
+        result[cls].violationScore += item.score ?? 0;
     });
 
     // Tính điểm cuối cùng
     for (const cls of Object.values(result)) {
-      cls.totalViolation = disciplineMax
-        - (cls.attendanceScore + cls.hygieneScore + cls.lineupScore + cls.violationScore);
+      cls.totalViolation =
+        disciplineMax -
+        (cls.attendanceScore + cls.hygieneScore + cls.lineUpScore + cls.violationScore);
 
       cls.totalScore = cls.academicScore + cls.bonusScore + cls.totalViolation;
     }
 
-    // Chuẩn hóa dữ liệu trước khi trả ra
+    // Chuẩn hóa dữ liệu trả ra
     let scores = Object.values(result).map(s => ({
       className: s.className,
       grade: s.grade,
       weekNumber: s.weekNumber,
       attendanceScore: s.attendanceScore ?? 0,
       hygieneScore: s.hygieneScore ?? 0,
-      lineupScore: s.lineupScore ?? 0,
+      lineUpScore: s.lineUpScore ?? 0,
       violationScore: s.violationScore ?? 0,
       academicScore: s.academicScore ?? 0,
       bonusScore: s.bonusScore ?? 0,
