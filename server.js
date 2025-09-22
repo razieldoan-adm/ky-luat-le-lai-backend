@@ -57,7 +57,7 @@ app.use('/api/class-attendance-summaries', classAttendanceSummaryRoutes);
 app.use('/api/class-lineup-summaries', classLineupSummaryRoutes);
 app.use('/api/class-weekly-scores', classWeeklyScoreRoutes);
 app.use('/api/class-rank', emulationRoutes);
-
+app.use('/api/students',studentRoutes);
 
 
 // Kết nối MongoDB
