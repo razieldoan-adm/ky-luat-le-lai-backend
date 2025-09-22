@@ -25,9 +25,15 @@ exports.importExcel = async (req, res) => {
       // Cập nhật hoặc thêm mới (giữ nguyên số điện thoại cũ nếu có)
       await Student.findOneAndUpdate(
         { name: r['Tên'], className: r['Lớp'] },
-        { name: r['Tên'], className: r['Lớp'] },
+        { 
+          name: r['Tên'], 
+          className: r['Lớp'],
+          fatherPhone: '', // rỗng nếu Excel không có
+          motherPhone: ''
+        },
         { upsert: true, new: true }
       );
+
 
       imported++;
     }
