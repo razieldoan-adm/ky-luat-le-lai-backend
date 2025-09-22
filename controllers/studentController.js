@@ -8,27 +8,42 @@ exports.importExcel = async (req, res) => {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet);
 
-    // Giả sử file excel có cột: "Tên", "Lớp"
+    // Giả sử Excel chỉ có: Tên, Lớp
     const students = rows.map(r => ({
       name: r['Tên'],
-      className: r['Lớp'],
+      className: r['Lớp']
     }));
 
-    await Student.deleteMany({}); // xoá cũ để import mới
+    await Student.deleteMany({});
     await Student.insertMany(students);
 
     res.json({ message: 'Import thành công', count: students.length });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: 'Lỗi import' });
   }
 };
 
-exports.getAll = async (req, res) => {
+exports.getByClass = async (req, res) => {
   try {
-    const students = await Student.find();
+    const { className } = req.query;
+    const students = await Student.find(className ? { className } : {});
     res.json(students);
   } catch (err) {
     res.status(500).json({ error: 'Lỗi lấy danh sách' });
+  }
+};
+
+exports.updatePhones = async (req, res) => {
+  try {
+    const updates = req.body; // [{_id, fatherPhone, motherPhone}, ...]
+    for (let u of updates) {
+      await Student.findByIdAndUpdate(u._id, {
+        fatherPhone: u.fatherPhone,
+        motherPhone: u.motherPhone
+      });
+    }
+    res.json({ message: 'Cập nhật thành công' });
+  } catch (err) {
+    res.status(500).json({ error: 'Lỗi cập nhật' });
   }
 };
