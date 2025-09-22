@@ -18,6 +18,8 @@ const classAttendanceSummaryRoutes = require('./routes/classAttendanceSummaryRou
 const classLineupSummaryRoutes = require('./routes/classLineUpSummaryRoutes');
 const classWeeklyScoreRoutes = require('./routes/classWeeklyScoreRoutes');
 
+const studentRoutes = require('./routes/studentRoutes');
+
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 
