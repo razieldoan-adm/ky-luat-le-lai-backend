@@ -6,8 +6,13 @@ const { importExcel, getByClass, updatePhones } = require('../controllers/studen
 const router = express.Router();
 const upload = multer({ dest: 'uploads/' });
 
+// Import Excel
 router.post('/import', upload.single('file'), importExcel);
+
+// Lấy danh sách học sinh theo lớp
 router.get('/', getByClass);
+
+// Cập nhật số điện thoại cha mẹ
 router.post('/update-phones', updatePhones);
 
 module.exports = router;
