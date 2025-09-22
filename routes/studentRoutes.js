@@ -13,6 +13,6 @@ router.post('/import', upload.single('file'), importExcel);
 router.get('/', getByClass);
 
 // Cập nhật số điện thoại cha mẹ
-router.post('/update-phones', updatePhones);
+router.put('/update-phones', updatePhones);
 
 module.exports = router;
