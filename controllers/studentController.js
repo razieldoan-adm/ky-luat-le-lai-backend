@@ -85,3 +85,20 @@ exports.updatePhones = async (req, res) => {
     res.status(500).json({ error: 'Lỗi cập nhật' });
   }
 };
+// GET /api/students/search?name=abc
+exports.searchStudents = async (req, res) => {
+  try {
+    const name = req.query.name?.trim() || '';
+    if (!name) return res.json([]);
+
+    // Tìm gần đúng, không phân biệt hoa thường
+    const regex = new RegExp(name, 'i'); 
+    const students = await Student.find({ name: regex }).limit(10);
+
+    res.json(students);
+  } catch (err) {
+    console.error('Lỗi searchStudents:', err);
+    res.status(500).json({ error: 'Lỗi tìm kiếm học sinh' });
+  }
+};
+
