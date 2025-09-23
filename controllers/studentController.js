@@ -19,22 +19,33 @@ exports.importExcel = async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     let imported = 0;
-    for (const r of rows) {
-      if (!r['Họ tên'] || !r['Lớp']) continue;
 
-      // Cập nhật hoặc thêm mới (giữ nguyên số điện thoại cũ nếu có)
-      await Student.findOneAndUpdate(
-        { name: r['Họ tên'], className: r['Lớp'] },
-        { 
-          name: r['Họ tên'], 
-          className: r['Lớp'],
-          fatherPhone: '', // rỗng nếu Excel không có
-          motherPhone: ''
-        },
-        { upsert: true, new: true }
-      );
-      imported++;
-    }
+for (const r of rows) {
+  // Lấy tên linh hoạt (Họ tên hoặc Tên)
+  const name = (r['Họ tên'] || r['Tên'] || '').trim();
+  const className = (r['Lớp'] || '').trim();
+
+  // Bỏ qua dòng trống
+  if (!name || !className) continue;
+
+  // Lấy SĐT nếu có
+  const fatherPhone = (r['SĐT Ba'] || '').trim();
+  const motherPhone = (r['SĐT Mẹ'] || '').trim();
+
+  // Cập nhật hoặc thêm mới (upsert)
+  await Student.findOneAndUpdate(
+    { name, className },
+    {
+      name,
+      className,
+      fatherPhone,
+      motherPhone
+    },
+    { upsert: true, new: true }
+  );
+  imported++;
+}
+
 
     res.json({ message: 'Import thành công', count: imported });
   } catch (err) {
