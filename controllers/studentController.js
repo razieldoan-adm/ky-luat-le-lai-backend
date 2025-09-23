@@ -86,19 +86,25 @@ exports.updatePhones = async (req, res) => {
   }
 };
 // GET /api/students/search?name=abc
+// controllers/studentController.js
 exports.searchStudents = async (req, res) => {
   try {
     const name = req.query.name?.trim() || '';
+    const className = req.query.className?.trim() || '';
+
     if (!name) return res.json([]);
 
-    // Tìm gần đúng, không phân biệt hoa thường
-    const regex = new RegExp(name, 'i'); 
-    const students = await Student.find({ name: regex }).limit(10);
+    const regex = new RegExp(name, 'i');
+    const filter = { name: regex };
 
+    if (className) {
+      filter.className = className;
+    }
+
+    const students = await Student.find(filter).limit(10);
     res.json(students);
   } catch (err) {
     console.error('Lỗi searchStudents:', err);
     res.status(500).json({ error: 'Lỗi tìm kiếm học sinh' });
   }
 };
-
