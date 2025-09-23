@@ -33,8 +33,6 @@ exports.importExcel = async (req, res) => {
         },
         { upsert: true, new: true }
       );
-
-
       imported++;
     }
 
