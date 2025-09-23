@@ -20,7 +20,7 @@ exports.importExcel = async (req, res) => {
 
     let imported = 0;
     for (const r of rows) {
-      if (!r['Tên'] || !r['Lớp']) continue;
+      if (!r['Họ tên'] || !r['Lớp']) continue;
 
       // Cập nhật hoặc thêm mới (giữ nguyên số điện thoại cũ nếu có)
       await Student.findOneAndUpdate(
