@@ -4,12 +4,12 @@ const {
   getWeeklyScores,
   getTempWeeklyScores,
   saveWeeklyScores,
-  updateWeeklyScores,   // 👈 thêm mới
+  update,   // 👈 thêm mới
 } = require('../controllers/classWeeklyScoreController');
 
 router.get('/', getWeeklyScores);           // lấy dữ liệu đã lưu
 router.get('/temp', getTempWeeklyScores);   // lấy dữ liệu thô
 router.post('/', saveWeeklyScores);         // lưu dữ liệu lần đầu
-router.put('/:weekNumber', updateWeeklyScores); // cập nhật dữ liệu tuần
+router.put("/class-weekly-scores/update/:weekNumber", updateWeeklyScores);
 
 module.exports = router;
