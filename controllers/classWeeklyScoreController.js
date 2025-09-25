@@ -144,23 +144,20 @@ exports.updateWeeklyScores = async (req, res) => {
     // Lấy danh sách lớp có GVCN
     const classes = await Class.find({ teacher: { $ne: '' } }).lean();
 
-    // Duyệt từng lớp để tính lại điểm mới
     const results = await Promise.all(
       classes.map(async (cls) => {
-        // 👉 Lấy điểm thô từ Attendance, Hygiene, Violation...
+        // Lấy dữ liệu điểm thành phần
         const attendance = await Attendance.findOne({ className: cls.className, weekNumber });
         const hygiene = await Hygiene.findOne({ className: cls.className, weekNumber });
         const violation = await Violation.findOne({ className: cls.className, weekNumber });
 
-        // Tính điểm thành phần (có thể + thêm các phần khác nếu bạn đã config)
         const attendanceScore = attendance?.score ?? 0;
         const hygieneScore = hygiene?.score ?? 0;
         const violationScore = violation?.score ?? 0;
 
-        // Tổng điểm
         const total = attendanceScore + hygieneScore + violationScore;
 
-        // Ghi hoặc update vào ClassWeeklyScore
+        // Upsert điểm mới
         await ClassWeeklyScore.updateOne(
           { className: cls.className, weekNumber },
           {
@@ -178,7 +175,7 @@ exports.updateWeeklyScores = async (req, res) => {
       })
     );
 
-    // 👉 Tính hạng lại (sort theo total giảm dần)
+    // Xếp hạng lại theo tổng điểm
     const sorted = [...results].sort((a, b) => b.total - a.total);
     for (let i = 0; i < sorted.length; i++) {
       await ClassWeeklyScore.updateOne(
@@ -193,6 +190,7 @@ exports.updateWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /**
  * Hàm phụ: Thêm xếp hạng vào danh sách điểm
