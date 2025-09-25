@@ -160,6 +160,8 @@ exports.saveWeeklyScores = async (req, res) => {
 /**
  * Cập nhật điểm tuần (sau khi đã có dữ liệu trước đó)
  */
+// controllers/classWeeklyScoreController.js
+
 exports.updateWeeklyScores = async (req, res) => {
   try {
     const { weekNumber } = req.params;
@@ -169,6 +171,7 @@ exports.updateWeeklyScores = async (req, res) => {
       return res.status(400).json({ message: "Missing data" });
     }
 
+    // B1. Upsert điểm thành phần
     await Promise.all(
       scores.map(async (s) => {
         await ClassWeeklyScore.updateOne(
@@ -179,12 +182,78 @@ exports.updateWeeklyScores = async (req, res) => {
       })
     );
 
-    res.json({ message: "Updated" });
+    // B2. Lấy lại toàn bộ điểm tuần
+    const allScores = await ClassWeeklyScore.find({ weekNumber }).lean();
+
+    // B3. Tính lại totalViolation, totalScore, rank
+    // giả sử disciplineMax luôn = 100 (nếu có Setting thì lấy từ Setting model)
+    const disciplineMax = 100;
+
+    // Cập nhật lại điểm tính toán
+    const updatedScores = allScores.map((s) => {
+      const totalViolation =
+        disciplineMax -
+        (Number(s.violationScore || 0) +
+          Number(s.hygieneScore || 0) +
+          Number(s.attendanceScore || 0) +
+          Number(s.lineupScore || s.lineUpScore || 0));
+
+      const totalScore =
+        Number(s.academicScore || 0) + Number(s.bonusScore || 0) + totalViolation;
+
+      return {
+        ...s,
+        totalViolation,
+        totalScore,
+      };
+    });
+
+    // Gom theo khối để tính rank
+    const grouped = {};
+    updatedScores.forEach((s) => {
+      const grade = String(s.grade ?? "undefined");
+      if (!grouped[grade]) grouped[grade] = [];
+      grouped[grade].push(s);
+    });
+
+    // Xếp hạng trong từng khối
+    Object.values(grouped).forEach((arr) => {
+      arr.sort((a, b) => b.totalScore - a.totalScore);
+      let prev = null;
+      let prevRank = 0;
+      arr.forEach((row, i) => {
+        if (prev === null) {
+          row.rank = 1;
+          prev = row.totalScore;
+          prevRank = 1;
+        } else if (row.totalScore === prev) {
+          row.rank = prevRank;
+        } else {
+          row.rank = i + 1;
+          prev = row.totalScore;
+          prevRank = row.rank;
+        }
+      });
+    });
+
+    // B4. Ghi lại DB
+    await Promise.all(
+      updatedScores.map(async (s) => {
+        await ClassWeeklyScore.updateOne(
+          { className: s.className, weekNumber },
+          { ...s },
+          { upsert: true }
+        );
+      })
+    );
+
+    res.json({ message: "Updated & recalculated", scores: updatedScores });
   } catch (err) {
     console.error("Error in updateWeeklyScores:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /**
  * Hàm phụ: Thêm xếp hạng vào danh sách điểm
