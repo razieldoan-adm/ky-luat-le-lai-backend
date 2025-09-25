@@ -30,6 +30,9 @@ exports.getWeeklyScores = async (req, res) => {
 /**
  * Lấy dữ liệu thô cho tuần (chưa tính toán, chưa nhập học tập/thưởng)
  */
+/**
+ * Lấy dữ liệu thô cho tuần (chưa tính toán, chưa nhập học tập/thưởng)
+ */
 exports.getTempWeeklyScores = async (req, res) => {
   try {
     const { weekNumber } = req.query;
@@ -39,6 +42,7 @@ exports.getTempWeeklyScores = async (req, res) => {
 
     const week = parseInt(weekNumber, 10);
 
+    // Lấy dữ liệu từ 4 collection + setting
     const [attendance, hygiene, lineup, violation, settings] = await Promise.all([
       Attendance.find({ weekNumber: week }),
       Hygiene.find({ weekNumber: week }),
@@ -51,37 +55,42 @@ exports.getTempWeeklyScores = async (req, res) => {
 
     const result = {};
 
+    // Gộp dữ liệu theo lớp
     [...attendance, ...hygiene, ...lineup, ...violation].forEach(item => {
       const cls = item.className;
       if (!result[cls]) {
         result[cls] = {
           className: cls,
-          grade: item.grade,
+          grade: item.grade,  // lấy từ model nào có grade
           weekNumber: week,
           attendanceScore: 0,
           hygieneScore: 0,
           lineUpScore: 0,
           violationScore: 0,
-          academicScore: 0,
-          bonusScore: 0,
+          academicScore: 0,   // học tập nhập tay từ frontend
+          bonusScore: 0,      // thưởng nhập tay từ frontend
           totalViolation: 0,
           totalScore: 0,
           ranking: 0,
         };
       }
 
-      // Gán đúng điểm theo từng model
-      if (item.constructor.modelName === 'ClassAttendanceSummary')
-        result[cls].attendanceScore += item.score ?? 0;
+      // ✅ Mapping đúng field từng model
+      if (item.constructor.modelName === 'ClassAttendanceSummary') {
+        result[cls].attendanceScore += item.total ?? 0;   // dùng total
+      }
 
-      if (item.constructor.modelName === 'ClassHygieneScore')
-        result[cls].hygieneScore += item.score ?? 0;
+      if (item.constructor.modelName === 'ClassHygieneScore') {
+        result[cls].hygieneScore += item.totalScore ?? 0; // dùng totalScore
+      }
 
-      if (item.constructor.modelName === 'ClassLineUpSummary')
-        result[cls].lineUpScore += item.score ?? 0;
+      if (item.constructor.modelName === 'ClassLineUpSummary') {
+        result[cls].lineUpScore += item.total ?? 0;       // dùng total
+      }
 
-      if (item.constructor.modelName === 'ClassViolationScore')
-        result[cls].violationScore += item.score ?? 0;
+      if (item.constructor.modelName === 'ClassViolationScore') {
+        result[cls].violationScore += item.totalScore ?? 0; // dùng totalScore
+      }
     });
 
     // Tính điểm cuối cùng
@@ -90,7 +99,8 @@ exports.getTempWeeklyScores = async (req, res) => {
         disciplineMax -
         (cls.attendanceScore + cls.hygieneScore + cls.lineUpScore + cls.violationScore);
 
-      cls.totalScore = cls.academicScore + cls.bonusScore + cls.totalViolation;
+      cls.totalScore =
+        cls.academicScore + cls.bonusScore + cls.totalViolation;
     }
 
     // Chuẩn hóa dữ liệu trả ra
@@ -118,6 +128,7 @@ exports.getTempWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 /**
  * Lưu điểm tuần (sau khi frontend đã tính toán xong)
