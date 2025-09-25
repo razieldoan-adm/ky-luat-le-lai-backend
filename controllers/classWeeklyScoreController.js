@@ -133,127 +133,66 @@ exports.getTempWeeklyScores = async (req, res) => {
 /**
  * Lưu điểm tuần (sau khi frontend đã tính toán xong)
  */
-exports.saveWeeklyScores = async (req, res) => {
-  try {
-    const { weekNumber, scores } = req.body;
-    if (!weekNumber || !scores) {
-      return res.status(400).json({ message: "Missing data" });
-    }
-
-    await Promise.all(
-      scores.map(async (s) => {
-        await ClassWeeklyScore.updateOne(
-          { className: s.className, weekNumber },
-          { ...s, weekNumber },
-          { upsert: true }
-        );
-      })
-    );
-
-    res.json({ message: "Saved" });
-  } catch (err) {
-    console.error("Error in saveWeeklyScores:", err);
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-/**
- * Cập nhật điểm tuần (sau khi đã có dữ liệu trước đó)
- */
-// controllers/classWeeklyScoreController.js
-
 exports.updateWeeklyScores = async (req, res) => {
   try {
     const { weekNumber } = req.params;
-    const { scores } = req.body;
 
-    if (!weekNumber || !scores) {
-      return res.status(400).json({ message: "Missing data" });
+    if (!weekNumber) {
+      return res.status(400).json({ message: "Missing weekNumber" });
     }
 
-    // B1. Upsert điểm thành phần
-    await Promise.all(
-      scores.map(async (s) => {
+    // Lấy danh sách lớp có GVCN
+    const classes = await Class.find({ teacher: { $ne: '' } }).lean();
+
+    // Duyệt từng lớp để tính lại điểm mới
+    const results = await Promise.all(
+      classes.map(async (cls) => {
+        // 👉 Lấy điểm thô từ Attendance, Hygiene, Violation...
+        const attendance = await Attendance.findOne({ className: cls.className, weekNumber });
+        const hygiene = await Hygiene.findOne({ className: cls.className, weekNumber });
+        const violation = await Violation.findOne({ className: cls.className, weekNumber });
+
+        // Tính điểm thành phần (có thể + thêm các phần khác nếu bạn đã config)
+        const attendanceScore = attendance?.score ?? 0;
+        const hygieneScore = hygiene?.score ?? 0;
+        const violationScore = violation?.score ?? 0;
+
+        // Tổng điểm
+        const total = attendanceScore + hygieneScore + violationScore;
+
+        // Ghi hoặc update vào ClassWeeklyScore
         await ClassWeeklyScore.updateOne(
-          { className: s.className, weekNumber },
-          { ...s, weekNumber },
+          { className: cls.className, weekNumber },
+          {
+            className: cls.className,
+            weekNumber,
+            attendanceScore,
+            hygieneScore,
+            violationScore,
+            total,
+          },
           { upsert: true }
         );
+
+        return { className: cls.className, total };
       })
     );
 
-    // B2. Lấy lại toàn bộ điểm tuần
-    const allScores = await ClassWeeklyScore.find({ weekNumber }).lean();
+    // 👉 Tính hạng lại (sort theo total giảm dần)
+    const sorted = [...results].sort((a, b) => b.total - a.total);
+    for (let i = 0; i < sorted.length; i++) {
+      await ClassWeeklyScore.updateOne(
+        { className: sorted[i].className, weekNumber },
+        { rank: i + 1 }
+      );
+    }
 
-    // B3. Tính lại totalViolation, totalScore, rank
-    // giả sử disciplineMax luôn = 100 (nếu có Setting thì lấy từ Setting model)
-    const disciplineMax = 100;
-
-    // Cập nhật lại điểm tính toán
-    const updatedScores = allScores.map((s) => {
-      const totalViolation =
-        disciplineMax -
-        (Number(s.violationScore || 0) +
-          Number(s.hygieneScore || 0) +
-          Number(s.attendanceScore || 0) +
-          Number(s.lineupScore || s.lineUpScore || 0));
-
-      const totalScore =
-        Number(s.academicScore || 0) + Number(s.bonusScore || 0) + totalViolation;
-
-      return {
-        ...s,
-        totalViolation,
-        totalScore,
-      };
-    });
-
-    // Gom theo khối để tính rank
-    const grouped = {};
-    updatedScores.forEach((s) => {
-      const grade = String(s.grade ?? "undefined");
-      if (!grouped[grade]) grouped[grade] = [];
-      grouped[grade].push(s);
-    });
-
-    // Xếp hạng trong từng khối
-    Object.values(grouped).forEach((arr) => {
-      arr.sort((a, b) => b.totalScore - a.totalScore);
-      let prev = null;
-      let prevRank = 0;
-      arr.forEach((row, i) => {
-        if (prev === null) {
-          row.rank = 1;
-          prev = row.totalScore;
-          prevRank = 1;
-        } else if (row.totalScore === prev) {
-          row.rank = prevRank;
-        } else {
-          row.rank = i + 1;
-          prev = row.totalScore;
-          prevRank = row.rank;
-        }
-      });
-    });
-
-    // B4. Ghi lại DB
-    await Promise.all(
-      updatedScores.map(async (s) => {
-        await ClassWeeklyScore.updateOne(
-          { className: s.className, weekNumber },
-          { ...s },
-          { upsert: true }
-        );
-      })
-    );
-
-    res.json({ message: "Updated & recalculated", scores: updatedScores });
+    res.json({ message: "Weekly scores recalculated and updated successfully" });
   } catch (err) {
     console.error("Error in updateWeeklyScores:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 /**
  * Hàm phụ: Thêm xếp hạng vào danh sách điểm
