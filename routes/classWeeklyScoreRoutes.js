@@ -1,15 +1,10 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const {
-  getWeeklyScores,
-  getTempWeeklyScores,
-  saveWeeklyScores,
-  updateWeeklyScores,   // 👈 thêm mới
-} = require('../controllers/classWeeklyScoreController');
+const classWeeklyScoreController = require("../controllers/classWeeklyScoreController");
 
-router.get('/', getWeeklyScores);           // lấy dữ liệu đã lưu
-router.get('/temp', getTempWeeklyScores);   // lấy dữ liệu thô
-router.post('/', saveWeeklyScores);         // lưu dữ liệu lần đầu
-router.put("/update/:weekNumber", updateWeeklyScores);
+router.get("/", classWeeklyScoreController.getWeeklyScores);
+router.get("/temp/:weekNumber", classWeeklyScoreController.getTempWeeklyScores);
+router.post("/save", classWeeklyScoreController.saveWeeklyScores);
+router.put("/update/:weekNumber", classWeeklyScoreController.updateWeeklyScores);
 
 module.exports = router;
