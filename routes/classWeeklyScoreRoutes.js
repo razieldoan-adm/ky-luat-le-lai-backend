@@ -10,6 +10,6 @@ const {
 router.get('/', getWeeklyScores);           // lấy dữ liệu đã lưu
 router.get('/temp', getTempWeeklyScores);   // lấy dữ liệu thô
 router.post('/', saveWeeklyScores);         // lưu dữ liệu lần đầu
-router.put("/class-weekly-scores/update/:weekNumber", updateWeeklyScores);
+router.put("/update/:weekNumber", updateWeeklyScores);
 
 module.exports = router;
