@@ -239,7 +239,7 @@ exports.saveWeeklyScores = async (req, res) => {
   try {
     const { weekNumber, scores } = req.body;
     if (!weekNumber || !scores || !scores.length) {
-      return res.status(400).json({ message: "Missing data to save" });
+      return res.status(400).json({ message: "Thiếu dữ liệu để lưu" });
     }
 
     // 🔥 Lưu từng class
@@ -253,7 +253,7 @@ exports.saveWeeklyScores = async (req, res) => {
       )
     );
 
-    res.json({ message: "Saved successfully" });
+    res.json({ message: "Đã lưu dữ liệu tuần thành công" });
   } catch (err) {
     console.error("Error in saveWeeklyScores:", err);
     res.status(500).json({ message: "Server error" });
