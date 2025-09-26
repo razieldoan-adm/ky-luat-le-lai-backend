@@ -123,7 +123,7 @@ exports.searchStudents = async (req, res) => {
       filter.className = className;
     }
 
-    const students = await Student.find(filter).limit(10);
+    const students = await Student.find(filter).limit(100);
     res.json(students);
   } catch (err) {
     console.error('Lỗi searchStudents:', err);
