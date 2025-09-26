@@ -11,4 +11,7 @@ router.get('/temp', classWeeklyScoreController.getTempWeeklyScores);
 // POST cập nhật lại toàn bộ điểm tuần
 router.post('/update/:weekNumber', classWeeklyScoreController.updateWeeklyScores);
 
+// POST lưu dữ liệu tuần
+router.post('/save', classWeeklyScoreController.saveWeeklyScores);
+
 module.exports = router;
