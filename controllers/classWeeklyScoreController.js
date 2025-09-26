@@ -260,3 +260,30 @@ exports.saveWeeklyScores = async (req, res) => {
   }
 };
 
+exports.checkChanges = async (req, res) => {
+  try {
+    const { weekNumber } = req.params;
+
+    // lấy dữ liệu đã lưu
+    const saved = await ClassWeeklyScore.find({ weekNumber }).lean();
+
+    // lấy dữ liệu tính tạm
+    const temp = await getTempWeeklyScoresInternal(weekNumber); // tái sử dụng logic getTempWeeklyScores
+
+    // so sánh
+    const changed = JSON.stringify(saved.map(s => ({
+      className: s.className,
+      totalScore: s.totalScore,
+      ranking: s.ranking,
+    }))) !== JSON.stringify(temp.map(s => ({
+      className: s.className,
+      totalScore: s.totalScore,
+      ranking: s.ranking,
+    })));
+
+    res.json({ changed });
+  } catch (err) {
+    console.error("Error in checkChanges:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
