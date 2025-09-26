@@ -25,6 +25,11 @@ const classWeeklyScoreSchema = new mongoose.Schema({
 
   // Thứ hạng trong khối
   rank: { type: Number, default: 0 },
+
+  lastUpdated: {
+  type: Date,
+  default: Date.now,
+},
 }, { timestamps: true });
 
 // Đảm bảo mỗi lớp chỉ có 1 bản ghi/tuần
