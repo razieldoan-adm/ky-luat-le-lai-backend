@@ -87,6 +87,14 @@ exports.updatePhones = async (req, res) => {
 };
 // GET /api/students/search?name=abc
 // controllers/studentController.js
+const removeVietnameseTones = (str) => {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d").replace(/Đ/g, "D")
+    .replace(/[^a-zA-Z0-9\s]/g, "");
+};
+
 exports.searchStudents = async (req, res) => {
   try {
     const name = req.query.name?.trim() || '';
@@ -94,8 +102,20 @@ exports.searchStudents = async (req, res) => {
 
     if (!name) return res.json([]);
 
+    // regex cho tên có dấu
     const regex = new RegExp(name, 'i');
-    const filter = { name: regex };
+
+    // regex cho tên không dấu
+    const noAccent = removeVietnameseTones(name);
+    const noAccentRegex = new RegExp(noAccent, 'i');
+
+    // filter
+    const filter = {
+      $or: [
+        { name: regex },               // so khớp tên gốc
+        { normalizedName: noAccentRegex } // so khớp tên không dấu
+      ]
+    };
 
     if (className) {
       filter.className = className;
