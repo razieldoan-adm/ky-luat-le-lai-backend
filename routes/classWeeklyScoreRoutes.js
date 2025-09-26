@@ -14,4 +14,7 @@ router.post('/update/:weekNumber', classWeeklyScoreController.updateWeeklyScores
 // POST lưu dữ liệu tuần
 router.post('/save', classWeeklyScoreController.saveWeeklyScores);
 
+//so sánh thay đổi
+router.get('/check-changes/:weekNumber', classWeeklyScoreController.checkChanges);
+
 module.exports = router;
