@@ -231,3 +231,32 @@ function addRanking(scores) {
 
   return scores;
 }
+
+/**
+ * Lưu dữ liệu weekly score vào DB
+ */
+exports.saveWeeklyScores = async (req, res) => {
+  try {
+    const { weekNumber, scores } = req.body;
+    if (!weekNumber || !scores || !scores.length) {
+      return res.status(400).json({ message: "Missing data to save" });
+    }
+
+    // 🔥 Lưu từng class
+    await Promise.all(
+      scores.map(s =>
+        ClassWeeklyScore.updateOne(
+          { className: s.className, weekNumber },
+          { $set: s },
+          { upsert: true }
+        )
+      )
+    );
+
+    res.json({ message: "Saved successfully" });
+  } catch (err) {
+    console.error("Error in saveWeeklyScores:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
