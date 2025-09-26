@@ -100,22 +100,24 @@ exports.searchStudents = async (req, res) => {
     const name = req.query.name?.trim() || '';
     const className = req.query.className?.trim() || '';
 
-    if (!name) return res.json([]);
+    // Nếu không có tên và cũng không có className thì trả về rỗng
+    if (!name && !className) return res.json([]);
 
-    // regex cho tên có dấu
-    const regex = new RegExp(name, 'i');
+    let filter = {};
 
-    // regex cho tên không dấu
-    const noAccent = removeVietnameseTones(name);
-    const noAccentRegex = new RegExp(noAccent, 'i');
+    if (name) {
+      // regex cho tên có dấu
+      const regex = new RegExp(name, 'i');
 
-    // filter
-    const filter = {
-      $or: [
-        { name: regex },               // so khớp tên gốc
+      // regex cho tên không dấu
+      const noAccent = removeVietnameseTones(name);
+      const noAccentRegex = new RegExp(noAccent, 'i');
+
+      filter.$or = [
+        { name: regex },                  // so khớp tên gốc
         { normalizedName: noAccentRegex } // so khớp tên không dấu
-      ]
-    };
+      ];
+    }
 
     if (className) {
       filter.className = className;
