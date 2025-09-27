@@ -78,7 +78,7 @@ async function getTempWeeklyScoresInternal(week) {
   for (const cls of Object.values(result)) {
     cls.totalViolation =
       disciplineMax -
-      (cls.attendanceScore + cls.hygieneScore + cls.lineUpScore + cls.violationScore);
+      (cls.attendanceScore*5 + cls.hygieneScore + cls.lineUpScore + cls.violationScore);
 
     cls.totalScore =
       cls.academicScore + cls.bonusScore + cls.totalViolation;
