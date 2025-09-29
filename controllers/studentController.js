@@ -3,6 +3,15 @@ const Student = require('../models/Student');
 const XLSX = require('xlsx');
 const fs = require('fs');
 
+const removeVietnameseTones = (str) => {
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/[^a-zA-Z0-9\s]/g, "");
+};
+
 // 📌 Import danh sách học sinh từ Excel
 exports.importExcel = async (req, res) => {
   try {
@@ -20,31 +29,43 @@ exports.importExcel = async (req, res) => {
 
     let imported = 0;
 
-for (const r of rows) {
-  // Lấy tên linh hoạt (Họ tên hoặc Tên)
-  const name = (r['Họ tên'] || r['Tên'] || '').trim();
-  const className = (r['Lớp'] || '').trim();
+    for (const r of rows) {
+      // Lấy tên linh hoạt (Họ tên hoặc Tên)
+      const name = (r['Họ tên'] || r['Tên'] || '').trim();
+      const className = (r['Lớp'] || '').trim();
 
-  // Bỏ qua dòng trống
-  if (!name || !className) continue;
+      // Bỏ qua dòng trống
+      if (!name || !className) continue;
 
-  // Lấy SĐT nếu có
-  const fatherPhone = (r['SĐT Ba'] || '').trim();
-  const motherPhone = (r['SĐT Mẹ'] || '').trim();
+      // Lấy SĐT nếu có
+      const fatherPhone = (r['SĐT Ba'] || '').trim();
+      const motherPhone = (r['SĐT Mẹ'] || '').trim();
 
-  // Cập nhật hoặc thêm mới (upsert)
-  await Student.findOneAndUpdate(
-    { name, className },
-    {
-      name,
-      className,
-      fatherPhone,
-      motherPhone
-    },
-    { upsert: true, new: true }
-  );
-  imported++;
-}
+      // Tạo normalizedName (tên không dấu, chữ thường)
+      const normalizedName = removeVietnameseTones(name).toLowerCase();
+
+      // Cập nhật hoặc thêm mới (upsert)
+      await Student.findOneAndUpdate(
+        { name, className },
+        {
+          name,
+          className,
+          fatherPhone,
+          motherPhone,
+          normalizedName
+        },
+        { upsert: true, new: true }
+      );
+
+      imported++;
+    }
+
+    res.json({ message: 'Import thành công', count: imported });
+  } catch (err) {
+    console.error('Lỗi import Excel:', err);
+    res.status(500).json({ error: 'Lỗi import' });
+  }
+};
 
 
     res.json({ message: 'Import thành công', count: imported });
