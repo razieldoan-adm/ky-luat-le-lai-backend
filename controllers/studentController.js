@@ -68,13 +68,6 @@ exports.importExcel = async (req, res) => {
 };
 
 
-    res.json({ message: 'Import thành công', count: imported });
-  } catch (err) {
-    console.error('Lỗi import Excel:', err);
-    res.status(500).json({ error: 'Lỗi import' });
-  }
-};
-
 // 📌 Lấy danh sách học sinh theo lớp
 exports.getByClass = async (req, res) => {
   try {
