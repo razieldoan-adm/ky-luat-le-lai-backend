@@ -21,19 +21,20 @@ exports.saveSummaries = async (req, res) => {
         { className: s.className, weekNumber },
         {
           grade: s.grade,
-          data: s.data,
+          scores: s.scores,   // ✅ dùng scores thay vì data
           total: s.total,
         },
         { upsert: true, new: true }
       );
     }
 
-    res.json({ message: 'Saved successfully' });
+    res.json({ message: "Saved successfully" });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: "Server error" });
   }
 };
+
 exports.getByWeekAndClass = async (req, res) => {
   try {
     const { weekNumber, className } = req.query;
