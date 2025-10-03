@@ -1,14 +1,20 @@
-const mongoose = require('mongoose');
+// models/ClassHygieneScore.js
+const mongoose = require("mongoose");
 
-const classHygieneScoreSchema = new mongoose.Schema({
+const ClassHygieneScoreSchema = new mongoose.Schema({
   className: { type: String, required: true },
   grade: { type: String, required: true },
   weekNumber: { type: Number, required: true },
-  scores: {                     // ✅ thêm field này để lưu trạng thái checkbox
-    type: [Boolean],
-    default: [false, false, false, false, false] // T2-T6
+  scores: {
+    type: [[[Number]]], // 3D: [ngày][buổi][loại lỗi]
+    default: () =>
+      Array(5).fill(0).map(() =>   // 5 ngày
+        Array(2).fill(0).map(() => // 2 buổi
+          Array(3).fill(0)         // 3 lỗi
+        )
+      ),
   },
-  totalScore: { type: Number, default: 0 },
+  total: { type: Number, default: 0 }
 });
 
-module.exports = mongoose.model('ClassHygieneScore', classHygieneScoreSchema);
+module.exports = mongoose.model("ClassHygieneScore", ClassHygieneScoreSchema);
