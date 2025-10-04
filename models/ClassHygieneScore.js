@@ -1,15 +1,7 @@
-import mongoose, { Schema, Document } from "mongoose";
+const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-export interface IClassHygieneScore extends Document {
-  classId: mongoose.Types.ObjectId;
-  date: Date;
-  weekNumber: number;
-  absentDuty: number;
-  noLightFan: number;
-  notClosedDoor: number;
-}
-
-const ClassHygieneScoreSchema = new Schema<IClassHygieneScore>({
+const ClassHygieneScoreSchema = new Schema({
   classId: { type: Schema.Types.ObjectId, ref: "Class", required: true },
   date: { type: Date, required: true },
   weekNumber: { type: Number, required: true },
@@ -27,8 +19,11 @@ ClassHygieneScoreSchema.pre("save", function (next) {
 });
 
 // Đảm bảo 1 lớp - 1 ngày - 1 tuần chỉ có 1 bản ghi
-ClassHygieneScoreSchema.index({ classId: 1, date: 1, weekNumber: 1 }, { unique: true });
+ClassHygieneScoreSchema.index(
+  { classId: 1, date: 1, weekNumber: 1 },
+  { unique: true }
+);
 
-const ClassHygieneScore = mongoose.model<IClassHygieneScore>("ClassHygieneScore", ClassHygieneScoreSchema);
+const ClassHygieneScore = mongoose.model("ClassHygieneScore", ClassHygieneScoreSchema);
+
 module.exports = ClassHygieneScore;
-
