@@ -29,4 +29,6 @@ ClassHygieneScoreSchema.pre("save", function (next) {
 // Đảm bảo 1 lớp - 1 ngày - 1 tuần chỉ có 1 bản ghi
 ClassHygieneScoreSchema.index({ classId: 1, date: 1, weekNumber: 1 }, { unique: true });
 
-export default mongoose.model<IClassHygieneScore>("ClassHygieneScore", ClassHygieneScoreSchema);
+const ClassHygieneScore = mongoose.model<IClassHygieneScore>("ClassHygieneScore", ClassHygieneScoreSchema);
+module.exports = ClassHygieneScore;
+
