@@ -13,7 +13,6 @@ exports.saveClassHygieneScores = async (req, res) => {
       return res.status(400).json({ message: 'Thiếu dữ liệu bắt buộc' });
     }
 
-    // Upsert: nếu lớp + tuần đã có thì cập nhật, chưa có thì tạo mới
     const updated = await ClassHygieneScore.findOneAndUpdate(
       { className, weekNumber },
       { grade, className, weekNumber, records },
@@ -92,7 +91,6 @@ exports.getWeeklyTotal = async (req, res) => {
       return res.json({ className, weekNumber: Number(weekNumber), total: 0 });
     }
 
-    // 🔹 Cách 1: mỗi lỗi = 1 điểm, cuối tuần nhân 10
     let totalErrors = 0;
     for (const r of record.records) {
       for (const v of r.violations) {
@@ -101,14 +99,47 @@ exports.getWeeklyTotal = async (req, res) => {
     }
     const total = totalErrors * 10;
 
-    // 🔹 Nếu muốn cách 2 (có lỗi bất kỳ = 10 điểm):
-    // const total = record.records.filter(r =>
-    //   r.violations.some(v => (v.count || 0) > 0)
-    // ).length * 10;
-
     res.json({ className, weekNumber: Number(weekNumber), total });
   } catch (err) {
     console.error('❌ Lỗi khi tính hygiene weekly total:', err);
+    res.status(500).json({ message: 'Server error', detail: err.message });
+  }
+};
+
+/**
+ * @desc Tổng hợp tất cả lớp trong tuần + total
+ * @route GET /api/class-hygiene-scores/weekly-summary?weekNumber=31
+ */
+exports.getWeeklySummary = async (req, res) => {
+  try {
+    const { weekNumber } = req.query;
+
+    if (!weekNumber) {
+      return res.status(400).json({ message: 'Thiếu weekNumber.' });
+    }
+
+    const records = await ClassHygieneScore.find({ weekNumber: Number(weekNumber) });
+
+    const result = records.map(r => {
+      let totalErrors = 0;
+      for (const rec of r.records) {
+        for (const v of rec.violations) {
+          totalErrors += v.count || 0;
+        }
+      }
+      const total = totalErrors * 10;
+
+      return {
+        className: r.className,
+        grade: r.grade,
+        weekNumber: r.weekNumber,
+        total,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Lỗi getWeeklySummary (Hygiene):', err);
     res.status(500).json({ message: 'Server error', detail: err.message });
   }
 };
