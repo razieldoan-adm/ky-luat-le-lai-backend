@@ -1,3 +1,4 @@
+
 const ClassHygieneScore = require("../models/ClassHygieneScore");
 
 // Lưu
@@ -13,9 +14,18 @@ const saveClassHygieneScores = async (req, res) => {
       await ClassHygieneScore.findOneAndUpdate(
         { classId: s.classId, date: s.date, weekNumber },
         {
-          absentDuty: s.absentDuty,
-          noLightFan: s.noLightFan,
-          notClosedDoor: s.notClosedDoor,
+          sessions: {
+            morning: {
+              absentDuty: s.morning?.absentDuty || 0,
+              noLightFan: s.morning?.noLightFan || 0,
+              notClosedDoor: s.morning?.notClosedDoor || 0,
+            },
+            afternoon: {
+              absentDuty: s.afternoon?.absentDuty || 0,
+              noLightFan: s.afternoon?.noLightFan || 0,
+              notClosedDoor: s.afternoon?.notClosedDoor || 0,
+            },
+          },
         },
         { upsert: true, new: true }
       );
@@ -70,16 +80,25 @@ const getSummaryByWeek = async (req, res) => {
     const scores = await ClassHygieneScore.find({ weekNumber: Number(weekNumber) })
       .populate("classId", "name");
 
-    const summary = scores.map((s) => ({
-      classId: s.classId._id,
-      className: s.classId.name,
-      weekNumber: s.weekNumber,
-      absentDuty: s.absentDuty,
-      noLightFan: s.noLightFan,
-      notClosedDoor: s.notClosedDoor,
-      total: (s.absentDuty + s.noLightFan + s.notClosedDoor) * 10,
-      date: s.date,
-    }));
+    const summary = scores.map((s) => {
+      const morning = s.sessions?.morning || {};
+      const afternoon = s.sessions?.afternoon || {};
+
+      const absentDuty = (morning.absentDuty || 0) + (afternoon.absentDuty || 0);
+      const noLightFan = (morning.noLightFan || 0) + (afternoon.noLightFan || 0);
+      const notClosedDoor = (morning.notClosedDoor || 0) + (afternoon.notClosedDoor || 0);
+
+      return {
+        classId: s.classId._id,
+        className: s.classId.name,
+        weekNumber: s.weekNumber,
+        absentDuty,
+        noLightFan,
+        notClosedDoor,
+        total: (absentDuty + noLightFan + notClosedDoor) * 10,
+        date: s.date,
+      };
+    });
 
     res.json(summary);
   } catch (err) {
