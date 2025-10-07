@@ -10,7 +10,7 @@ const upload = multer({ dest: 'uploads/' });
 router.post('/import', upload.single('file'), importExcel);
 
 // Lấy danh sách học sinh theo lớp
-router.get('/', getByClass);
+router.get('/by-class', getByClass);
 
 // Cập nhật số điện thoại cha mẹ
 router.post('/update-phones', updatePhones);
