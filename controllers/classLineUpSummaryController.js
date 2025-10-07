@@ -1,7 +1,6 @@
-
 // controllers/classLineUpSummaryController.js
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
-const ClassWeeklySummary = require('../models/ClassWeeklySummary');
+const ClassWeeklyScore = require('../models/ClassWeeklyScore');
 const moment = require('moment');
 
 // 🔹 Ghi nhận lỗi xếp hàng
@@ -34,18 +33,15 @@ exports.recordViolation = async (req, res) => {
     const weekNumber = moment(currentDate).week();
     const year = moment(currentDate).year();
 
-    await ClassWeeklySummary.findOneAndUpdate(
-      { className, weekNumber, year },
-      {
-        $inc: { lineUpScore: -10, violationCount: 1 },
-        $setOnInsert: { createdAt: new Date() },
-      },
+    await ClassWeeklyScore.findOneAndUpdate(
+      { className, weekNumber },
+      { $inc: { lineUpScore: 10 }, $setOnInsert: { grade: '', lastUpdated: new Date() } },
       { upsert: true, new: true }
     );
 
     res.status(201).json({ message: 'Ghi nhận thành công', data: newRecord });
   } catch (error) {
-    console.error(error);
+    console.error('recordViolation error:', error);
     res.status(500).json({ message: 'Lỗi khi ghi nhận vi phạm' });
   }
 };
@@ -69,7 +65,7 @@ exports.getViolations = async (req, res) => {
     const records = await ClassLineUpSummary.find(filter).sort({ date: -1 });
     res.json(records);
   } catch (error) {
-    console.error(error);
+    console.error('getViolations error:', error);
     res.status(500).json({ message: 'Lỗi khi lấy danh sách vi phạm' });
   }
 };
@@ -84,34 +80,32 @@ exports.deleteViolation = async (req, res) => {
     await ClassLineUpSummary.findByIdAndDelete(id);
 
     const weekNumber = moment(record.date).week();
-    const year = moment(record.date).year();
 
-    await ClassWeeklySummary.findOneAndUpdate(
-      { className: record.className, weekNumber, year },
-      { $inc: { lineUpScore: 10, violationCount: -1 } }
+    await ClassWeeklyScore.findOneAndUpdate(
+      { className: record.className, weekNumber },
+      { $inc: { lineUpScore: -10 } }
     );
 
     res.json({ message: 'Xóa thành công' });
   } catch (error) {
-    console.error(error);
+    console.error('deleteViolation error:', error);
     res.status(500).json({ message: 'Lỗi khi xóa vi phạm' });
   }
 };
 
-// 🔹 Tổng hợp điểm theo tuần
+// 🔹 Tổng hợp điểm xếp hàng theo tuần
 exports.getWeeklyScores = async (req, res) => {
   try {
-    const { week, year } = req.query;
+    const { week } = req.query;
     const weekNumber = week ? parseInt(week) : moment().week();
-    const currentYear = year ? parseInt(year) : moment().year();
 
-    const summaries = await ClassWeeklySummary.find({ weekNumber, year: currentYear })
-      .sort({ lineUpScore: 1 }); // điểm âm nhiều = xếp hạng thấp
+    const summaries = await ClassWeeklyScore.find({ weekNumber })
+      .select('className grade lineUpScore totalScore')
+      .sort({ lineUpScore: -1 });
 
     res.json(summaries);
   } catch (error) {
-    console.error(error);
+    console.error('getWeeklyScores error:', error);
     res.status(500).json({ message: 'Lỗi khi lấy tổng điểm tuần' });
   }
 };
-
