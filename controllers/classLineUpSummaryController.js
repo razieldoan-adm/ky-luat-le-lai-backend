@@ -1,56 +1,86 @@
 // controllers/classLineUpSummaryController.js
-const ClassLineUpSummary = require('../models/ClassLineUpSummary');
+const Violation = require("../models/Violation");
 
-exports.getByWeek = async (req, res) => {
+// 🟢 Ghi nhận lỗi xếp hàng
+exports.addLineupViolation = async (req, res) => {
   try {
-    const { weekNumber } = req.query;
-    const summaries = await ClassLineUpSummary.find({ weekNumber });
-    res.json(summaries);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+    const {
+      classId,
+      date,
+      session,
+      violationType,
+      studentId,
+      note,
+      recordedBy,
+      pointDeducted,
+    } = req.body;
 
-exports.saveSummaries = async (req, res) => {
-  try {
-    const { weekNumber, summaries } = req.body;
-
-    for (const s of summaries) {
-      await ClassLineUpSummary.findOneAndUpdate(
-        { className: s.className, weekNumber },
-        {
-          grade: s.grade,
-          scores: s.scores,   // ✅ dùng scores thay vì data
-          total: s.total,
-        },
-        { upsert: true, new: true }
-      );
+    // Xác định buổi nếu không nhập
+    let finalSession = session;
+    if (!finalSession) {
+      const hour = new Date().getHours();
+      if (hour >= 7 && hour < 11) finalSession = "Sáng";
+      else if (hour >= 13 && hour < 17) finalSession = "Chiều";
+      else finalSession = "Khác";
     }
 
-    res.json({ message: "Saved successfully" });
-  } catch (err) {
-    console.error(err);
+    const newViolation = new Violation({
+      classId,
+      date: date || new Date(),
+      session: finalSession,
+      category: "xep-hang",
+      violationType,
+      studentId: studentId || null,
+      note: note || "",
+      recordedBy,
+      pointDeducted: pointDeducted || 10, // mặc định 10 điểm
+    });
+
+    await newViolation.save();
+    res.status(201).json(newViolation);
+  } catch (error) {
+    console.error("Error adding lineup violation:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-exports.getByWeekAndClass = async (req, res) => {
+// 🟡 Lấy danh sách lỗi theo ngày hoặc tuần
+exports.getLineupViolations = async (req, res) => {
   try {
-    const { weekNumber, className } = req.query;
+    const { date, week } = req.query;
+    const filter = { category: "xep-hang" };
 
-    if (!weekNumber || !className) {
-      return res.status(400).json({ message: 'Thiếu weekNumber hoặc className.' });
+    if (date) {
+      const day = new Date(date);
+      const next = new Date(day);
+      next.setDate(day.getDate() + 1);
+      filter.date = { $gte: day, $lt: next };
     }
 
-    const summaries = await ClassLineUpSummary.find({
-      weekNumber: Number(weekNumber),
-      className
-    });
+    if (week) {
+      const start = new Date(week.startDate);
+      const end = new Date(week.endDate);
+      filter.date = { $gte: start, $lte: end };
+    }
 
-    res.json(summaries);
-  } catch (err) {
-    console.error('❌ Lỗi getByWeekAndClass (LineUp):', err);
-    res.status(500).json({ message: 'Server error' });
+    const list = await Violation.find(filter)
+      .populate("classId", "name")
+      .populate("studentId", "name")
+      .sort({ date: -1 });
+
+    res.json(list);
+  } catch (error) {
+    console.error("Error fetching lineup violations:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// 🔴 Xóa lỗi
+exports.deleteLineupViolation = async (req, res) => {
+  try {
+    await Violation.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting violation" });
   }
 };
