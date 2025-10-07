@@ -1,4 +1,3 @@
-// controllers/classLineUpSummaryController.js
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
 const moment = require('moment');
@@ -9,6 +8,7 @@ exports.recordViolation = async (req, res) => {
     const { className, date, session, violation, studentName, note, recorder } = req.body;
     const currentDate = date ? new Date(date) : new Date();
 
+    // Xác định buổi
     let sessionValue = session;
     if (!sessionValue) {
       const hour = currentDate.getHours();
@@ -17,6 +17,7 @@ exports.recordViolation = async (req, res) => {
       else sessionValue = 'Khác';
     }
 
+    // Lưu vi phạm xếp hàng
     const newRecord = new ClassLineUpSummary({
       className,
       date: currentDate,
@@ -29,13 +30,17 @@ exports.recordViolation = async (req, res) => {
     });
     await newRecord.save();
 
-    // Cập nhật điểm xếp hàng trong tổng kết tuần
+    // Xác định tuần và năm
     const weekNumber = moment(currentDate).week();
     const year = moment(currentDate).year();
 
+    // Cộng dồn điểm xếp hàng (mỗi lỗi +10)
     await ClassWeeklyScore.findOneAndUpdate(
       { className, weekNumber },
-      { $inc: { lineUpScore: 10 }, $setOnInsert: { grade: '', lastUpdated: new Date() } },
+      {
+        $inc: { lineUpScore: 10 },
+        $setOnInsert: { grade: '', year, lastUpdated: new Date() },
+      },
       { upsert: true, new: true }
     );
 
@@ -50,7 +55,7 @@ exports.recordViolation = async (req, res) => {
 exports.getViolations = async (req, res) => {
   try {
     const { date, week } = req.query;
-    let filter = {};
+    const filter = {};
 
     if (date) {
       const start = moment(date).startOf('day');
@@ -81,6 +86,7 @@ exports.deleteViolation = async (req, res) => {
 
     const weekNumber = moment(record.date).week();
 
+    // Khi xóa → trừ lại 10 điểm đã cộng
     await ClassWeeklyScore.findOneAndUpdate(
       { className: record.className, weekNumber },
       { $inc: { lineUpScore: -10 } }
@@ -96,10 +102,11 @@ exports.deleteViolation = async (req, res) => {
 // 🔹 Tổng hợp điểm xếp hàng theo tuần
 exports.getWeeklyScores = async (req, res) => {
   try {
-    const { week } = req.query;
+    const { week, year } = req.query;
     const weekNumber = week ? parseInt(week) : moment().week();
+    const currentYear = year ? parseInt(year) : moment().year();
 
-    const summaries = await ClassWeeklyScore.find({ weekNumber })
+    const summaries = await ClassWeeklyScore.find({ weekNumber, year: currentYear })
       .select('className grade lineUpScore totalScore')
       .sort({ lineUpScore: -1 });
 
