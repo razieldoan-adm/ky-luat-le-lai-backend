@@ -1,5 +1,8 @@
 const ClassLineUpSummary = require('../models/ClassLineUpSummary')
 const Setting = require('../models/Setting');
+const AcademicWeek = require('../models/AcademicWeek');
+// Tạo mới hoặc cập nhật điểm thi đua kỷ luật lớp theo tuần
+const Class = require('../models/Class'); // đảm bảo import model Class
 
 // ✅ Ghi nhận lỗi
 export const createRecord = async (req, res) => {
