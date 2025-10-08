@@ -15,7 +15,7 @@ const settingTimeRoutes = require('./routes/settingTimeRoutes');
 const classViolationScoreRoutes = require('./routes/classViolationScoreRoutes');
 const classHygieneScoreRoutes = require('./routes/classHygieneScoreRoutes');
 const classAttendanceSummaryRoutes = require('./routes/classAttendanceSummaryRoutes');
-const classLineupSummaryRoutes = require('./routes/classLineUpSummaryRoutes');
+const classLineUpSummaryRoutes = require('./routes/classLineUpSummaryRoutes');
 const classWeeklyScoreRoutes = require('./routes/classWeeklyScoreRoutes');
 
 const studentRoutes = require('./routes/studentRoutes');
@@ -54,7 +54,7 @@ app.use('/api/class-academic-scores', classAcademicScoreRoutes);
 app.use('/api/class-violation-scores', classViolationScoreRoutes);
 app.use('/api/class-hygiene-scores', classHygieneScoreRoutes);
 app.use('/api/class-attendance-summaries', classAttendanceSummaryRoutes);
-app.use('/api/class-lineup-summaries', classLineupSummaryRoutes);
+app.use('/api/class-lineup-summaries', classLineUpSummaryRoutes);
 app.use('/api/class-weekly-scores', classWeeklyScoreRoutes);
 app.use('/api/class-rank', emulationRoutes);
 app.use('/api/students',studentRoutes);
