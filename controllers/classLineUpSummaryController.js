@@ -5,7 +5,7 @@ const AcademicWeek = require('../models/AcademicWeek');
 const Class = require('../models/Class'); // đảm bảo import model Class
 
 // ✅ Ghi nhận lỗi
-export const createRecord = async (req, res) => {
+const createRecord = async (req, res) => {
   try {
     const data = {
       ...req.body,
