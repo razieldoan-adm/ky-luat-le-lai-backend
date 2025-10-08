@@ -1,14 +1,26 @@
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 
 // ✅ Ghi nhận lỗi
-const createRecord = async (req, res) => {
+export const createRecord = async (req, res) => {
   try {
-    const record = new ClassLineUpSummary(req.body);
+    const data = {
+      ...req.body,
+      date: req.body.date ? new Date(req.body.date) : new Date(), // ✅ Tự gán ngày hệ thống
+      scoreChange: req.body.scoreChange ?? 10, // ✅ Mặc định 10 điểm
+    };
+
+    console.log("📥 Dữ liệu nhận được:", data);
+
+    const record = new ClassLineUpSummary(data);
     await record.save();
+
     res.status(201).json(record);
   } catch (err) {
-    console.error("Lỗi ghi nhận:", err);
-    res.status(500).json({ message: "Không thể ghi nhận vi phạm" });
+    console.error("❌ Lỗi ghi nhận:", err);
+    res.status(500).json({
+      message: "Không thể ghi nhận vi phạm",
+      error: err.message,
+    });
   }
 };
 
