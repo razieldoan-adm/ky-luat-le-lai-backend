@@ -1,4 +1,4 @@
-
+const ClassLineUpSummary = require('../models/ClassLineUpSummary')
 const Setting = require('../models/Setting');
 
 // ✅ Ghi nhận lỗi
