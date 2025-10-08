@@ -1,148 +1,133 @@
+
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
-const moment = require('moment');
+const AcademicWeek = require('../models/AcademicWeek');
 
-// 🔹 Ghi nhận lỗi xếp hàng
+// Hàm tìm tuần học hiện tại dựa trên ngày
+async function findCurrentWeek(date) {
+  const targetDate = new Date(date);
+  const weeks = await AcademicWeek.find();
+
+  return (
+    weeks.find(
+      (w) =>
+        new Date(w.startDate) <= targetDate && targetDate <= new Date(w.endDate)
+    ) || null
+  );
+}
+
+// ✅ Ghi nhận điểm xếp hàng (thêm bản ghi)
 exports.recordViolation = async (req, res) => {
   try {
-    const { className, date, session, violation, studentName, note, recorder } = req.body;
+    const { className, grade, date, scoreChange } = req.body;
+
     const currentDate = date ? new Date(date) : new Date();
+    const currentWeek = await findCurrentWeek(currentDate);
 
-    // Xác định buổi
-    let sessionValue = session;
-    if (!sessionValue) {
-      const hour = currentDate.getHours();
-      if (hour >= 7 && hour < 11) sessionValue = 'Sáng';
-      else if (hour >= 13 && hour < 17) sessionValue = 'Chiều';
-      else sessionValue = 'Khác';
-    }
+    if (!currentWeek)
+      return res.status(404).json({ message: 'Không tìm thấy tuần học hiện tại.' });
 
-    // Lưu vi phạm xếp hàng
-    const newRecord = new ClassLineUpSummary({
+    const weekNumber = currentWeek.weekNumber;
+
+    // Lưu bản ghi xếp hàng
+    const record = new ClassLineUpSummary({
       className,
+      grade,
       date: currentDate,
-      session: sessionValue,
-      violation: violation || 'Không xếp hàng',
-      studentName,
-      note,
-      recorder,
-      minusPoint: 10,
+      scoreChange,
+      weekNumber,
     });
-    await newRecord.save();
+    await record.save();
 
-    // Xác định tuần và năm
-    const weekNumber = moment(currentDate).week();
-    const year = moment(currentDate).year();
-
-    // Cộng dồn điểm xếp hàng (mỗi lỗi +10)
-    await ClassWeeklyScore.findOneAndUpdate(
+    // Cập nhật điểm trong ClassWeeklyScore
+    const weekly = await ClassWeeklyScore.findOneAndUpdate(
       { className, weekNumber },
-      {
-        $inc: { lineUpScore: 10 },
-        $setOnInsert: { grade: '', year, lastUpdated: new Date() },
-      },
-      { upsert: true, new: true }
+      { $inc: { lineUpScore: scoreChange } },
+      { new: true, upsert: true }
     );
 
-    res.status(201).json({ message: 'Ghi nhận thành công', data: newRecord });
+    res.json({ message: 'Ghi nhận thành công', weekly });
   } catch (error) {
     console.error('recordViolation error:', error);
-    res.status(500).json({ message: 'Lỗi khi ghi nhận vi phạm' });
+    res.status(500).json({ message: 'Lỗi khi ghi nhận xếp hàng' });
   }
 };
 
-// 🔹 Lấy danh sách lỗi theo ngày hoặc tuần
-// ✅ Không dùng moment nữa
+// ✅ Lấy danh sách bản ghi xếp hàng theo ngày hoặc tuần
 exports.getViolations = async (req, res) => {
   try {
     const { date, week } = req.query;
     const filter = {};
 
     if (date) {
-      // --- Lọc theo ngày cụ thể ---
-      const d = new Date(date);
-      if (!isNaN(d.getTime())) {
-        const start = new Date(d);
-        start.setHours(0, 0, 0, 0);
-
-        const end = new Date(d);
-        end.setHours(23, 59, 59, 999);
-
-        filter.date = { $gte: start, $lte: end };
-      }
-    } else if (week) {
-      // --- Lọc theo tuần học ---
-      // Nếu bạn có collection AcademicWeek, nên dùng startDate/endDate trong đó để chính xác nhất.
-      // Còn nếu chưa, ta tạm tính dựa theo tuần hiện tại như frontend.
-
-      const year = new Date().getFullYear();
-      const weekNum = parseInt(week);
-
-      // Ngày đầu năm
-      const jan1 = new Date(year, 0, 1);
-      // Chuyển Sunday = 7, Monday = 1
-      const jan1Day = jan1.getDay() === 0 ? 7 : jan1.getDay();
-
-      // Tính offset tới đầu tuần cần tìm (Thứ 2)
-      const start = new Date(jan1);
-      start.setDate(jan1.getDate() - jan1Day + 1 + (weekNum - 1) * 7);
+      const day = new Date(date);
+      const start = new Date(day);
       start.setHours(0, 0, 0, 0);
-
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
+      const end = new Date(day);
       end.setHours(23, 59, 59, 999);
-
       filter.date = { $gte: start, $lte: end };
+    } else if (week) {
+      const targetWeek = await AcademicWeek.findOne({ weekNumber: Number(week) });
+      if (targetWeek) {
+        filter.date = {
+          $gte: new Date(targetWeek.startDate),
+          $lte: new Date(targetWeek.endDate),
+        };
+      }
     }
 
-    // --- Lấy dữ liệu ---
     const records = await ClassLineUpSummary.find(filter).sort({ date: -1 });
     res.json(records);
   } catch (error) {
-    console.error("getViolations error:", error);
-    res.status(500).json({ message: "Lỗi khi lấy danh sách vi phạm" });
+    console.error('getViolations error:', error);
+    res.status(500).json({ message: 'Lỗi khi lấy danh sách xếp hàng' });
   }
 };
 
-
-// 🔹 Xóa ghi nhận
+// ✅ Xóa bản ghi và trừ điểm tương ứng
 exports.deleteViolation = async (req, res) => {
   try {
     const { id } = req.params;
     const record = await ClassLineUpSummary.findById(id);
-    if (!record) return res.status(404).json({ message: 'Không tìm thấy bản ghi' });
+    if (!record)
+      return res.status(404).json({ message: 'Không tìm thấy bản ghi.' });
 
-    await ClassLineUpSummary.findByIdAndDelete(id);
+    const currentWeek = await findCurrentWeek(record.date);
+    if (!currentWeek)
+      return res.status(404).json({ message: 'Không tìm thấy tuần học.' });
 
-    const weekNumber = moment(record.date).week();
-
-    // Khi xóa → trừ lại 10 điểm đã cộng
     await ClassWeeklyScore.findOneAndUpdate(
-      { className: record.className, weekNumber },
-      { $inc: { lineUpScore: -10 } }
+      { className: record.className, weekNumber: currentWeek.weekNumber },
+      { $inc: { lineUpScore: -record.scoreChange } }
     );
 
-    res.json({ message: 'Xóa thành công' });
+    await record.deleteOne();
+    res.json({ message: 'Đã xóa bản ghi thành công.' });
   } catch (error) {
     console.error('deleteViolation error:', error);
-    res.status(500).json({ message: 'Lỗi khi xóa vi phạm' });
+    res.status(500).json({ message: 'Lỗi khi xóa bản ghi.' });
   }
 };
 
-// 🔹 Tổng hợp điểm xếp hàng theo tuần
+// ✅ Lấy điểm xếp hàng trong tuần (để render tổng hợp)
 exports.getWeeklyScores = async (req, res) => {
   try {
-    const { week, year } = req.query;
-    const weekNumber = week ? parseInt(week) : moment().week();
-    const currentYear = year ? parseInt(year) : moment().year();
+    const { week } = req.query;
+    let targetWeek = week
+      ? await AcademicWeek.findOne({ weekNumber: Number(week) })
+      : await findCurrentWeek(new Date());
 
-    const summaries = await ClassWeeklyScore.find({ weekNumber, year: currentYear })
-      .select('className grade lineUpScore totalScore')
-      .sort({ lineUpScore: -1 });
+    if (!targetWeek)
+      return res.status(404).json({ message: 'Không tìm thấy tuần học.' });
 
-    res.json(summaries);
+    const scores = await ClassWeeklyScore.find({
+      weekNumber: targetWeek.weekNumber,
+    });
+
+    res.json(scores);
   } catch (error) {
     console.error('getWeeklyScores error:', error);
-    res.status(500).json({ message: 'Lỗi khi lấy tổng điểm tuần' });
+    res.status(500).json({ message: 'Lỗi khi lấy điểm xếp hàng.' });
   }
 };
+
