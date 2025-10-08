@@ -52,28 +52,58 @@ exports.recordViolation = async (req, res) => {
 };
 
 // 🔹 Lấy danh sách lỗi theo ngày hoặc tuần
+// ✅ Không dùng moment nữa
 exports.getViolations = async (req, res) => {
   try {
     const { date, week } = req.query;
     const filter = {};
 
     if (date) {
-      const start = moment(date).startOf('day');
-      const end = moment(date).endOf('day');
-      filter.date = { $gte: start, $lte: end };
+      // --- Lọc theo ngày cụ thể ---
+      const d = new Date(date);
+      if (!isNaN(d.getTime())) {
+        const start = new Date(d);
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(d);
+        end.setHours(23, 59, 59, 999);
+
+        filter.date = { $gte: start, $lte: end };
+      }
     } else if (week) {
-      const start = moment().week(week).startOf('week');
-      const end = moment().week(week).endOf('week');
+      // --- Lọc theo tuần học ---
+      // Nếu bạn có collection AcademicWeek, nên dùng startDate/endDate trong đó để chính xác nhất.
+      // Còn nếu chưa, ta tạm tính dựa theo tuần hiện tại như frontend.
+
+      const year = new Date().getFullYear();
+      const weekNum = parseInt(week);
+
+      // Ngày đầu năm
+      const jan1 = new Date(year, 0, 1);
+      // Chuyển Sunday = 7, Monday = 1
+      const jan1Day = jan1.getDay() === 0 ? 7 : jan1.getDay();
+
+      // Tính offset tới đầu tuần cần tìm (Thứ 2)
+      const start = new Date(jan1);
+      start.setDate(jan1.getDate() - jan1Day + 1 + (weekNum - 1) * 7);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+
       filter.date = { $gte: start, $lte: end };
     }
 
+    // --- Lấy dữ liệu ---
     const records = await ClassLineUpSummary.find(filter).sort({ date: -1 });
     res.json(records);
   } catch (error) {
-    console.error('getViolations error:', error);
-    res.status(500).json({ message: 'Lỗi khi lấy danh sách vi phạm' });
+    console.error("getViolations error:", error);
+    res.status(500).json({ message: "Lỗi khi lấy danh sách vi phạm" });
   }
 };
+
 
 // 🔹 Xóa ghi nhận
 exports.deleteViolation = async (req, res) => {
