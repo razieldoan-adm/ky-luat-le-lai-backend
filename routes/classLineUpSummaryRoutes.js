@@ -1,19 +1,10 @@
-import express from "express";
-import {
-  createRecord,
-  getWeeklySummary,
-  deleteRecord,
-} from "../controllers/classLineUpSummaryController.js";
-
+const express = require('express');
 const router = express.Router();
+const controller = require('../controllers/classLineUpSummaryController');
 
-// POST: Ghi nhận lỗi
-router.post("/", createRecord);
+router.post('/', controller.recordViolation);
+router.get('/', controller.getViolations);
+router.delete('/:id', controller.deleteViolation);
+router.get('/weekly-summary', controller.getWeeklyScores);
 
-// GET: Danh sách vi phạm trong tuần
-router.get("/weekly-summary", getWeeklySummary);
-
-// DELETE: Xóa vi phạm
-router.delete("/:id", deleteRecord);
-
-export default router;
+module.exports = router; // ✅ dòng này là bắt buộc
