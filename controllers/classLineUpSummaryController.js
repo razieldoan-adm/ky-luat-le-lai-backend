@@ -1,7 +1,7 @@
-import ClassLineUpSummary from "../models/ClassLineUpSummary.js";
+const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 
 // ✅ Ghi nhận lỗi
-export const createRecord = async (req, res) => {
+const createRecord = async (req, res) => {
   try {
     const record = new ClassLineUpSummary(req.body);
     await record.save();
@@ -13,7 +13,7 @@ export const createRecord = async (req, res) => {
 };
 
 // ✅ Lấy danh sách vi phạm trong tuần hiện tại
-export const getWeeklySummary = async (req, res) => {
+const getWeeklySummary = async (req, res) => {
   try {
     const today = new Date();
     const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1)); // Thứ 2
@@ -31,7 +31,7 @@ export const getWeeklySummary = async (req, res) => {
 };
 
 // ✅ Xóa vi phạm (trừ điểm)
-export const deleteRecord = async (req, res) => {
+const deleteRecord = async (req, res) => {
   try {
     const record = await ClassLineUpSummary.findByIdAndDelete(req.params.id);
     if (!record) return res.status(404).json({ message: "Không tìm thấy vi phạm" });
@@ -40,4 +40,10 @@ export const deleteRecord = async (req, res) => {
     console.error("Lỗi khi xóa:", err);
     res.status(500).json({ message: "Không thể xóa vi phạm" });
   }
+};
+
+module.exports = {
+  createRecord,
+  getWeeklySummary,
+  deleteRecord,
 };
