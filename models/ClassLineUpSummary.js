@@ -9,4 +9,4 @@ const classLineUpSummarySchema = new mongoose.Schema({
   scoreChange: { type: Number, default: 10 }, // ✅ mỗi lỗi +10 điểm
 });
 
-export default mongoose.model("ClassLineUpSummary", classLineUpSummarySchema);
+module.exports = mongoose.model("ClassLineUpSummary", classLineUpSummarySchema);
