@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const classLineUpSummarySchema = new mongoose.Schema({
   className: { type: String, required: true },
