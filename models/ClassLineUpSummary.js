@@ -1,16 +1,12 @@
-
-// models/ClassLineUpSummary.js
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
 const classLineUpSummarySchema = new mongoose.Schema({
-  className: { type: String, required: true, trim: true, uppercase: true },
-  date: { type: Date, required: true, default: Date.now },
-  session: { type: String, enum: ['Sáng', 'Chiều', 'Khác'], default: 'Sáng' },
+  className: { type: String, required: true },
+  studentName: { type: String, default: "" },
   violation: { type: String, required: true },
-  studentName: { type: String, default: '' },
-  note: { type: String, default: '' },
+  date: { type: Date, required: true },
   recorder: { type: String, required: true },
-  minusPoint: { type: Number, default: 10 },
+  scoreChange: { type: Number, default: 10 }, // ✅ mỗi lỗi +10 điểm
 });
 
-module.exports = mongoose.model('ClassLineUpSummary', classLineUpSummarySchema);
+export default mongoose.model("ClassLineUpSummary", classLineUpSummarySchema);
