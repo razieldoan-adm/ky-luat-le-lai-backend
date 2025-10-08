@@ -2,9 +2,8 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/classLineUpSummaryController');
 
-router.post('/', controller.recordViolation);
-router.get('/', controller.getViolations);
-router.delete('/:id', controller.deleteViolation);
-router.get('/weekly-summary', controller.getWeeklyScores);
+router.post('/', controller.createRecord);
+router.get('/weekly-summary', controller.getWeeklySummary);
+router.delete('/:id', controller.deleteRecord);
 
-module.exports = router; // ✅ dòng này là bắt buộc
+module.exports = router;
