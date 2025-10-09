@@ -1,86 +1,90 @@
+// controllers/classLineUpSummaryController.js
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 const Setting = require('../models/Setting');
-const AcademicWeek = require('../models/AcademicWeek');
-const Class = require('../models/Class');
 
-// ✅ Ghi nhận lỗi xếp hàng
+// Helper: lấy điểm mặc định (thử nhiều tên trường trong Setting, fallback = 10)
+function getDefaultPenalty(setting) {
+  if (!setting) return 10;
+  return setting.defaultLineUpPenalty
+    ?? setting.defaultViolationScore
+    ?? setting.lineUpScore
+    ?? 10;
+}
+
+// 🔹 Ghi nhận lỗi xếp hàng
 exports.createRecord = async (req, res) => {
   try {
-    // 🔹 Lấy điểm trừ mặc định từ settings
-    const setting = await Setting.findOne();
-    const defaultScore = setting?.lineUpScore || 10; // nếu chưa cấu hình thì mặc định 10
+    const { className, studentName, violation, date, recorder } = req.body;
 
-    // 🔹 Tạo mới bản ghi lỗi
+    // Lấy setting (nếu có)
+    const setting = await Setting.findOne();
+    const defaultPenalty = getDefaultPenalty(setting);
+
     const record = new ClassLineUpSummary({
-      ...req.body,
-      scoreChange: -Math.abs(defaultScore), // luôn là điểm âm
+      className,
+      studentName: studentName || '',
+      violation,
+      date: date ? new Date(date) : new Date(),
+      recorder: recorder || 'Giám Thị',
+      // Lưu số điểm dưới dạng dương hoặc âm tùy bạn; ở UI ta hiển thị '-' nếu cần.
+      scoreChange: defaultPenalty, 
     });
 
     await record.save();
-
-    // 🔹 (Tuỳ chọn) cập nhật tổng điểm xếp hạng của lớp trong tuần
-    const classInfo = await Class.findOne({ name: req.body.className });
-    if (classInfo) {
-      const currentWeek = await AcademicWeek.findOne({ isCurrent: true });
-      if (currentWeek) {
-        // Có thể thêm phần cộng/trừ điểm xếp hạng tại đây
-        // Ví dụ:
-        // await ClassViolationScore.findOneAndUpdate(
-        //   { classId: classInfo._id, weekId: currentWeek._id },
-        //   { $inc: { lineupScore: record.scoreChange } },
-        //   { upsert: true, new: true }
-        // );
-      }
-    }
-
-    res.status(201).json(record);
+    return res.status(201).json(record);
   } catch (err) {
-    console.error('❌ Lỗi ghi nhận:', err);
-    res.status(500).json({ message: 'Không thể ghi nhận vi phạm' });
+    console.error('createRecord error:', err);
+    return res.status(500).json({ message: 'Không thể ghi nhận vi phạm' });
   }
 };
 
-// ✅ Lấy danh sách lỗi (lọc theo tuần hoặc toàn bộ)
-exports.getRecords = async (req, res) => {
+// 🔹 Lấy danh sách vi phạm trong tuần hiện tại (Tuần: Thứ 2 -> CN)
+exports.getWeeklySummary = async (req, res) => {
   try {
-    const { filter } = req.query; // filter = 'week' hoặc 'all'
-    let records = [];
+    // Tính Monday và Sunday của tuần chứa ngày hiện tại
+    const today = new Date();
+    const day = today.getDay(); // 0..6 (0 = Sun)
+    // tính thứ Hai: nếu sunday (0) thì monday = today -6
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
 
-    if (filter === 'week') {
-      // 🔹 Xác định thứ Hai và Chủ nhật tuần hiện tại
-      const today = new Date();
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - today.getDay() + 1);
-      monday.setHours(0, 0, 0, 0);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
 
-      records = await ClassLineUpSummary.find({
-        date: { $gte: monday, $lte: sunday },
-      }).sort({ date: -1 });
-    } else {
-      records = await ClassLineUpSummary.find().sort({ date: -1 });
-    }
+    const records = await ClassLineUpSummary.find({
+      date: { $gte: monday, $lte: sunday },
+    }).sort({ date: -1 });
 
-    res.json(records);
+    return res.json(records);
   } catch (err) {
-    console.error('❌ Lỗi khi lấy danh sách:', err);
-    res.status(500).json({ message: 'Không thể tải dữ liệu' });
+    console.error('getWeeklySummary error:', err);
+    return res.status(500).json({ message: 'Lỗi khi lấy dữ liệu tuần' });
   }
 };
 
-// ✅ Xóa lỗi
+// 🔹 Lấy tất cả bản ghi (nếu cần) — giữ cho tương thích
+exports.getAllRecords = async (req, res) => {
+  try {
+    const records = await ClassLineUpSummary.find().sort({ date: -1 });
+    return res.json(records);
+  } catch (err) {
+    console.error('getAllRecords error:', err);
+    return res.status(500).json({ message: 'Lỗi khi lấy danh sách' });
+  }
+};
+
+// 🔹 Xóa vi phạm
 exports.deleteRecord = async (req, res) => {
   try {
-    const record = await ClassLineUpSummary.findByIdAndDelete(req.params.id);
-    if (!record) {
-      return res.status(404).json({ message: 'Không tìm thấy vi phạm' });
-    }
-
-    res.json({ message: 'Đã xóa vi phạm', deleted: record });
+    const id = req.params.id;
+    const record = await ClassLineUpSummary.findByIdAndDelete(id);
+    if (!record) return res.status(404).json({ message: 'Không tìm thấy vi phạm' });
+    return res.json({ message: 'Đã xóa vi phạm', deleted: record });
   } catch (err) {
-    console.error('❌ Lỗi khi xóa:', err);
-    res.status(500).json({ message: 'Không thể xóa vi phạm' });
+    console.error('deleteRecord error:', err);
+    return res.status(500).json({ message: 'Không thể xóa vi phạm' });
   }
 };
