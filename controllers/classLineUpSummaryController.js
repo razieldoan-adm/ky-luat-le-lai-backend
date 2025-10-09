@@ -1,6 +1,7 @@
 // controllers/classLineUpSummaryController.js
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 const Setting = require('../models/Setting');
+const AcademicWeek = require("../models/AcademicWeek");
 
 // Helper: lấy điểm mặc định (thử nhiều tên trường trong Setting, fallback = 10)
 function getDefaultPenalty(setting) {
@@ -14,56 +15,70 @@ function getDefaultPenalty(setting) {
 // 🔹 Ghi nhận lỗi xếp hàng
 exports.createRecord = async (req, res) => {
   try {
-    const { className, studentName, violation, date, recorder } = req.body;
+    const { className, studentName, violation, recorder, date } = req.body;
 
-    // Lấy setting (nếu có)
+    // 🔹 1. Tìm tuần tương ứng theo ngày
+    const targetWeek = await AcademicWeek.findOne({
+      startDate: { $lte: date },
+      endDate: { $gte: date },
+    });
+
+    const weekNumber = targetWeek ? targetWeek.weekNumber : null;
+
+    // 🔹 2. Lấy điểm mặc định từ Setting (hoặc 10 nếu chưa có)
     const setting = await Setting.findOne();
-    const defaultPenalty = getDefaultPenalty(setting);
+    const defaultScore = setting?.lineUpScore || 10;
 
+    // 🔹 3. Tạo record
     const record = new ClassLineUpSummary({
       className,
-      studentName: studentName || '',
+      studentName,
       violation,
-      date: date ? new Date(date) : new Date(),
-      recorder: recorder || 'Giám Thị',
-      // Lưu số điểm dưới dạng dương hoặc âm tùy bạn; ở UI ta hiển thị '-' nếu cần.
-      scoreChange: defaultPenalty, 
+      recorder,
+      date,
+      weekNumber, // ✅ thêm vào đây
+      scoreChange: -Math.abs(defaultScore),
     });
 
     await record.save();
-    return res.status(201).json(record);
+    res.status(201).json(record);
   } catch (err) {
-    console.error('createRecord error:', err);
-    return res.status(500).json({ message: 'Không thể ghi nhận vi phạm' });
+    console.error("Lỗi ghi nhận:", err);
+    res.status(500).json({ message: "Không thể ghi nhận vi phạm" });
   }
 };
 
 // 🔹 Lấy danh sách vi phạm trong tuần hiện tại (Tuần: Thứ 2 -> CN)
 exports.getWeeklySummary = async (req, res) => {
   try {
-    // Tính Monday và Sunday của tuần chứa ngày hiện tại
-    const today = new Date();
-    const day = today.getDay(); // 0..6 (0 = Sun)
-    // tính thứ Hai: nếu sunday (0) thì monday = today -6
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    const monday = new Date(today);
-    monday.setDate(today.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
+    const { weekNumber } = req.query;
+    let targetWeek = null;
 
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
+    if (weekNumber) {
+      targetWeek = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
+    } else {
+      const today = new Date();
+      targetWeek = await AcademicWeek.findOne({
+        startDate: { $lte: today },
+        endDate: { $gte: today },
+      });
+    }
 
-    const records = await ClassLineUpSummary.find({
-      date: { $gte: monday, $lte: sunday },
-    }).sort({ date: -1 });
+    if (!targetWeek) return res.status(404).json({ message: "Không xác định được tuần" });
 
-    return res.json(records);
+    const records = await ClassLineUpSummary.find({ weekNumber: targetWeek.weekNumber }).sort({ date: -1 });
+    res.json({
+      weekNumber: targetWeek.weekNumber,
+      startDate: targetWeek.startDate,
+      endDate: targetWeek.endDate,
+      records,
+    });
   } catch (err) {
-    console.error('getWeeklySummary error:', err);
-    return res.status(500).json({ message: 'Lỗi khi lấy dữ liệu tuần' });
+    console.error("Lỗi getWeeklySummary:", err);
+    res.status(500).json({ message: "Không thể tải dữ liệu" });
   }
 };
+
 
 // 🔹 Lấy tất cả bản ghi (nếu cần) — giữ cho tương thích
 exports.getAllRecords = async (req, res) => {
