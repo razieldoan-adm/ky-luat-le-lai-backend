@@ -1,53 +1,57 @@
-const ClassLineUpSummary = require('../models/ClassLineUpSummary')
-const Setting = require('../models/Setting');
-const AcademicWeek = require('../models/AcademicWeek');
-// Tạo mới hoặc cập nhật điểm thi đua kỷ luật lớp theo tuần
-const Class = require('../models/Class'); // đảm bảo import model Class
+import ClassLineUpSummary from "../models/ClassLineUpSummary.js";
+import Setting from "../models/Setting.js";
 
-// ✅ Ghi nhận lỗi
-const createRecord = async (req, res) => {
+// ✅ Ghi nhận lỗi xếp hàng
+export const createRecord = async (req, res) => {
   try {
-    const data = {
+    // Lấy điểm trừ mặc định từ settings
+    const setting = await Setting.findOne();
+    const defaultScore = setting?.lineUpScore || 10; // ví dụ key lưu trong Setting là "lineUpScore"
+
+    const record = new ClassLineUpSummary({
       ...req.body,
-      date: req.body.date ? new Date(req.body.date) : new Date(), // ✅ Tự gán ngày hệ thống
-      scoreChange: req.body.scoreChange ?? 10, // ✅ Mặc định 10 điểm
-    };
+      scoreChange: -Math.abs(defaultScore), // luôn trừ điểm
+    });
 
-    console.log("📥 Dữ liệu nhận được:", data);
-
-    const record = new ClassLineUpSummary(data);
     await record.save();
-
     res.status(201).json(record);
   } catch (err) {
-    console.error("❌ Lỗi ghi nhận:", err);
-    res.status(500).json({
-      message: "Không thể ghi nhận vi phạm",
-      error: err.message,
-    });
+    console.error("Lỗi ghi nhận:", err);
+    res.status(500).json({ message: "Không thể ghi nhận vi phạm" });
   }
 };
 
-// ✅ Lấy danh sách vi phạm trong tuần hiện tại
-const getWeeklySummary = async (req, res) => {
+// ✅ Lấy danh sách lỗi (lọc theo tuần hoặc toàn bộ)
+export const getRecords = async (req, res) => {
   try {
-    const today = new Date();
-    const firstDayOfWeek = new Date(today.setDate(today.getDate() - today.getDay() + 1)); // Thứ 2
-    const lastDayOfWeek = new Date(today.setDate(firstDayOfWeek.getDate() + 6)); // CN
+    const { filter } = req.query; // filter = 'week' hoặc 'all'
+    let records = [];
 
-    const records = await ClassLineUpSummary.find({
-      date: { $gte: firstDayOfWeek, $lte: lastDayOfWeek },
-    }).sort({ date: -1 });
+    if (filter === "week") {
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - today.getDay() + 1);
+      monday.setHours(0, 0, 0, 0);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      records = await ClassLineUpSummary.find({
+        date: { $gte: monday, $lte: sunday },
+      }).sort({ date: -1 });
+    } else {
+      records = await ClassLineUpSummary.find().sort({ date: -1 });
+    }
 
     res.json(records);
   } catch (err) {
-    console.error("Lỗi khi lấy dữ liệu tuần:", err);
-    res.status(500).json({ message: "Không thể tải danh sách vi phạm tuần" });
+    console.error("Lỗi khi lấy danh sách:", err);
+    res.status(500).json({ message: "Không thể tải dữ liệu" });
   }
 };
 
-// ✅ Xóa vi phạm (trừ điểm)
-const deleteRecord = async (req, res) => {
+// ✅ Xóa lỗi
+export const deleteRecord = async (req, res) => {
   try {
     const record = await ClassLineUpSummary.findByIdAndDelete(req.params.id);
     if (!record) return res.status(404).json({ message: "Không tìm thấy vi phạm" });
@@ -56,10 +60,4 @@ const deleteRecord = async (req, res) => {
     console.error("Lỗi khi xóa:", err);
     res.status(500).json({ message: "Không thể xóa vi phạm" });
   }
-};
-
-module.exports = {
-  createRecord,
-  getWeeklySummary,
-  deleteRecord,
 };
