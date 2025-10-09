@@ -2,6 +2,7 @@
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 const Setting = require('../models/Setting');
 const AcademicWeek = require("../models/AcademicWeek");
+const ClassWeeklyScore = require('../models/ClassWeeklyScore');
 
 // Helper: lấy điểm mặc định (thử nhiều tên trường trong Setting, fallback = 10)
 function getDefaultPenalty(setting) {
@@ -101,5 +102,65 @@ exports.deleteRecord = async (req, res) => {
   } catch (err) {
     console.error('deleteRecord error:', err);
     return res.status(500).json({ message: 'Không thể xóa vi phạm' });
+  }
+};
+// 🔹 Tổng hợp điểm xếp hàng theo lớp trong tuần
+exports.getClassLineUpTotal = async (req, res) => {
+  try {
+    const { weekNumber } = req.query;
+    if (!weekNumber) return res.status(400).json({ message: "Thiếu weekNumber" });
+
+    const records = await ClassLineUpSummary.find({ weekNumber: Number(weekNumber) });
+
+    // Gom nhóm theo lớp
+    const grouped = {};
+    records.forEach((r) => {
+      if (!grouped[r.className]) grouped[r.className] = [];
+      grouped[r.className].push(r.scoreChange);
+    });
+
+    // Tổng hợp
+    const result = Object.keys(grouped).map((className) => {
+      const scores = grouped[className];
+      const total = scores.reduce((a, b) => a + b, 0);
+      return {
+        className,
+        scores,
+        total,
+        count: scores.length,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("Lỗi getClassLineUpTotal:", err);
+    res.status(500).json({ message: "Không thể tính tổng điểm xếp hàng" });
+  }
+};
+
+
+
+// 🔹 Cập nhật hoặc tạo mới điểm xếp hàng của lớp trong tuần
+exports.updateWeeklyLineUpScore = async (req, res) => {
+  try {
+    const { className, weekNumber, lineUpScore } = req.body;
+    if (!className || !weekNumber)
+      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc" });
+
+    const updated = await ClassWeeklyScore.findOneAndUpdate(
+      { className, weekNumber },
+      {
+        $set: {
+          lineUpScore: lineUpScore || 0,
+          lastUpdated: new Date(),
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Lỗi updateWeeklyLineUpScore:", err);
+    res.status(500).json({ message: "Không thể cập nhật điểm xếp hàng" });
   }
 };
