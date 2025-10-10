@@ -62,7 +62,7 @@ exports.getViolationsByStudent = async (req, res) => {
 
 // ➕ Ghi nhận vi phạm mới (lưu cả weekNumber)
 exports.createViolation = async (req, res) => {
-  const { className, description, handlingMethod, weekNumber, time } = req.body;
+  const { className, description, handlingMethod, handledBy, handlingNote, weekNumber, time } = req.body;
   const name = normalizeName(req.body.name);
 
   try {
@@ -75,8 +75,11 @@ exports.createViolation = async (req, res) => {
       description,
       penalty,
       handlingMethod,
-      weekNumber: weekNumber,
-      time: time ? new Date(time) : new Date()
+      handledBy,                      // ✅ thêm
+      handlingNote,                   // ✅ thêm
+      handled: !!handledBy,            // ✅ nếu có người xử lý thì đánh dấu true
+      weekNumber,
+      time: time ? new Date(time) : new Date(),
     });
 
     await violation.save();
@@ -88,6 +91,7 @@ exports.createViolation = async (req, res) => {
     res.status(500).json({ error: 'Lỗi khi ghi nhận vi phạm.' });
   }
 };
+
 
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
 exports.handleViolation = async (req, res) => {
