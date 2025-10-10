@@ -4,9 +4,15 @@ const SettingTime = require('../models/SettingTime');
 const dayjs = require('dayjs');
 const isoWeek = require('dayjs/plugin/isoWeek');
 const weekday = require('dayjs/plugin/weekday');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
 
+// 👉 Kích hoạt plugin timezone toàn cục
 dayjs.extend(isoWeek);
 dayjs.extend(weekday);
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault('Asia/Ho_Chi_Minh');
 
 /**
  * Generate weeks based on SettingTime start & end
@@ -70,13 +76,11 @@ exports.getWeeks = async (req, res) => {
 
 /**
  * Bulk update weeks
- * Xoá toàn bộ tuần cũ và insert lại theo mảng weeks gửi lên
  */
 exports.updateWeeksBulk = async (req, res) => {
   try {
-    const updatedWeeks = req.body; // [{ startDate, endDate, isStudyWeek }]
+    const updatedWeeks = req.body;
 
-    // Xoá toàn bộ tuần cũ
     await AcademicWeek.deleteMany({});
 
     let weekNumberCounter = 1;
@@ -87,12 +91,10 @@ exports.updateWeeksBulk = async (req, res) => {
         isStudyWeek: week.isStudyWeek
       };
 
-      // Nếu được chọn, gán weekNumber tăng dần
       if (week.isStudyWeek) {
-        newWeek.weekNumber = weekNumberCounter;
-        weekNumberCounter++;
+        newWeek.weekNumber = weekNumberCounter++;
       } else {
-        newWeek.weekNumber = null; // hoặc không gán field này nếu schema không yêu cầu
+        newWeek.weekNumber = null;
       }
 
       return newWeek;
@@ -107,7 +109,6 @@ exports.updateWeeksBulk = async (req, res) => {
   }
 };
 
-
 /**
  * Delete all weeks
  */
@@ -120,6 +121,7 @@ exports.deleteAllWeeks = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server' });
   }
 };
+
 /**
  * Get study weeks
  */
@@ -132,14 +134,18 @@ exports.getStudyWeeks = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server' });
   }
 };
+
+/**
+ * Get current study week (the week where today is between startDate and endDate)
+ */
 exports.getCurrentStudyWeek = async (req, res) => {
   try {
-      const todayStart = dayjs().add(7, 'hour').startOf('day').toDate(); // 00:00 VN
-    const todayEnd = dayjs().add(7, 'hour').endOf('day').toDate();     // 23:59:59.999 VN
+    // ✅ Lấy đúng ngày theo múi giờ VN
+    const todayVN = dayjs().tz('Asia/Ho_Chi_Minh').toDate();
 
     const currentWeek = await AcademicWeek.findOne({
-      startDate: { $lte: today },
-      endDate: { $gte: today },
+      startDate: { $lte: todayVN },
+      endDate: { $gte: todayVN },
       isStudyWeek: true
     }).lean();
 
