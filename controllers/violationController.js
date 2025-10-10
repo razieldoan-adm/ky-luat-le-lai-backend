@@ -96,12 +96,17 @@ exports.createViolation = async (req, res) => {
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
 exports.handleViolation = async (req, res) => {
   const { id } = req.params;
-  const { handled, handlingMethod } = req.body;
+  const { handled, handlingMethod, handledBy, handlingNote } = req.body; // ✅ thêm 2 field
 
   try {
     const updated = await Violation.findByIdAndUpdate(
       id,
-      { handled, handlingMethod },
+      {
+        handled: handled ?? true, // ✅ nếu không gửi thì mặc định true
+        handlingMethod,
+        handledBy,
+        handlingNote,
+      },
       { new: true }
     );
 
@@ -111,9 +116,11 @@ exports.handleViolation = async (req, res) => {
 
     res.json(updated);
   } catch (err) {
+    console.error('Lỗi khi xử lý vi phạm:', err);
     res.status(500).json({ error: 'Lỗi server khi xử lý vi phạm' });
   }
 };
+
 
 // ✅ Đánh dấu vi phạm đã xử lý
 exports.markViolationHandled = async (req, res) => {
