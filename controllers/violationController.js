@@ -192,11 +192,12 @@ exports.getUnhandledViolationStudents = async (req, res) => {
 exports.getAllViolationStudents = async (req, res) => {
   try {
     const violations = await Violation.find().sort({ time: -1 });
-    res.json(violations);
+    res.json(violations); // ✅ dữ liệu trả về đã có handledBy và handlingNote
   } catch (error) {
     res.status(500).json({ error: 'Lỗi server khi lấy danh sách vi phạm' });
   }
 };
+
 
 // 📌 Tổng số vi phạm
 exports.getViolationCount = async (req, res) => {
