@@ -134,7 +134,7 @@ exports.getStudyWeeks = async (req, res) => {
 };
 exports.getCurrentStudyWeek = async (req, res) => {
   try {
-    const today = new Date();
+      const today = dayjs().add(7, 'hour').toDate();
 
     const currentWeek = await AcademicWeek.findOne({
       startDate: { $lte: today },
