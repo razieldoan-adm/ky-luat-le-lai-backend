@@ -6,7 +6,7 @@ const controller = require("../controllers/classWeeklyScoreController");
 router.get("/weekly", controller.getWeeklyScores);
 
 // 🔹 Cập nhật hoặc tạo mới điểm cho lớp trong tuần (chung cho tất cả các loại điểm)
-router.post("/update", controller.updateWeeklyScore);
+router.post("/update", controller.updateWeeklyScores);
 
 // 🔹 (Tuỳ chọn) Lấy tổng hợp điểm hoặc bảng xếp hạng
 router.get("/ranking", controller.getWeeklyRanking);
