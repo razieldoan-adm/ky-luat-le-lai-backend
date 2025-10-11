@@ -22,7 +22,7 @@ exports.getWeeklyScores = async (req, res) => {
  * POST /weekly-scores/update
  * Cập nhật điểm (gọi chung cho lineup, hygiene, violation,...)
  */
-exports.updateWeeklyScore = async (req, res) => {
+exports.updateWeeklyScores = async (req, res) => {
   try {
     const { className, weekNumber, ...scores } = req.body;
     if (!className || !weekNumber)
