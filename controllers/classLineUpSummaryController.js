@@ -1,4 +1,3 @@
-// controllers/classLineUpSummaryController.js
 const ClassLineUpSummary = require('../models/ClassLineUpSummary');
 const Setting = require('../models/Setting');
 const AcademicWeek = require("../models/AcademicWeek");
@@ -38,7 +37,7 @@ exports.createRecord = async (req, res) => {
       recorder,
       date,
       weekNumber,
-      scoreChange: Math.abs(defaultScore), // ✅ Ghi dương để thống nhất công thức tính
+      scoreChange: Math.abs(defaultScore),
     });
 
     await record.save();
@@ -49,7 +48,7 @@ exports.createRecord = async (req, res) => {
   }
 };
 
-// 🔹 Lấy danh sách vi phạm trong tuần hiện tại (Tuần: Thứ 2 -> CN)
+// 🔹 Lấy danh sách vi phạm trong tuần
 exports.getWeeklySummary = async (req, res) => {
   try {
     const { weekNumber } = req.query;
@@ -80,8 +79,7 @@ exports.getWeeklySummary = async (req, res) => {
   }
 };
 
-
-// 🔹 Lấy tất cả bản ghi (nếu cần)
+// 🔹 Lấy tất cả bản ghi
 exports.getAllRecords = async (req, res) => {
   try {
     const records = await ClassLineUpSummary.find().sort({ date: -1 });
@@ -125,12 +123,12 @@ exports.getClassLineUpTotal = async (req, res) => {
       const scores = grouped[className];
       const total = scores.reduce((a, b) => a + b, 0);
 
-      // ✅ Lưu tổng dương vào ClassWeeklyScore.lineUpScore
+      // ✅ Luôn lưu tổng điểm dương
       await ClassWeeklyScore.findOneAndUpdate(
         { className, weekNumber: Number(weekNumber) },
         {
           $set: {
-            lineUpScore: total,
+            lineUpScore: Math.abs(total),
             lastUpdated: new Date(),
           },
         },
@@ -147,7 +145,7 @@ exports.getClassLineUpTotal = async (req, res) => {
   }
 };
 
-// 🔹 Cập nhật hoặc tạo mới điểm xếp hàng của lớp trong tuần (thủ công)
+// 🔹 Cập nhật thủ công điểm xếp hàng
 exports.updateWeeklyLineUpScore = async (req, res) => {
   try {
     const { className, weekNumber, lineUpScore } = req.body;
