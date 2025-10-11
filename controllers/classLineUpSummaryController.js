@@ -30,15 +30,15 @@ exports.createRecord = async (req, res) => {
     const setting = await Setting.findOne();
     const defaultScore = setting?.lineUpScore || 10;
 
-    // 🔹 3. Tạo record
+    // 🔹 3. Tạo record (⚡ đổi sang điểm dương)
     const record = new ClassLineUpSummary({
       className,
       studentName,
       violation,
       recorder,
       date,
-      weekNumber, // ✅ thêm vào đây
-      scoreChange: -Math.abs(defaultScore),
+      weekNumber,
+      scoreChange: Math.abs(defaultScore), // ✅ Ghi dương để thống nhất công thức tính
     });
 
     await record.save();
@@ -81,7 +81,7 @@ exports.getWeeklySummary = async (req, res) => {
 };
 
 
-// 🔹 Lấy tất cả bản ghi (nếu cần) — giữ cho tương thích
+// 🔹 Lấy tất cả bản ghi (nếu cần)
 exports.getAllRecords = async (req, res) => {
   try {
     const records = await ClassLineUpSummary.find().sort({ date: -1 });
@@ -104,7 +104,8 @@ exports.deleteRecord = async (req, res) => {
     return res.status(500).json({ message: 'Không thể xóa vi phạm' });
   }
 };
-// 🔹 Tổng hợp điểm xếp hàng theo lớp trong tuần
+
+// 🔹 Tổng hợp điểm xếp hàng theo lớp trong tuần + lưu vào ClassWeeklyScore
 exports.getClassLineUpTotal = async (req, res) => {
   try {
     const { weekNumber } = req.query;
@@ -119,17 +120,25 @@ exports.getClassLineUpTotal = async (req, res) => {
       grouped[r.className].push(r.scoreChange);
     });
 
-    // Tổng hợp
-    const result = Object.keys(grouped).map((className) => {
+    // Tổng hợp và lưu
+    const result = await Promise.all(Object.keys(grouped).map(async (className) => {
       const scores = grouped[className];
       const total = scores.reduce((a, b) => a + b, 0);
-      return {
-        className,
-        scores,
-        total,
-        count: scores.length,
-      };
-    });
+
+      // ✅ Lưu tổng dương vào ClassWeeklyScore.lineUpScore
+      await ClassWeeklyScore.findOneAndUpdate(
+        { className, weekNumber: Number(weekNumber) },
+        {
+          $set: {
+            lineUpScore: total,
+            lastUpdated: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+
+      return { className, scores, total, count: scores.length };
+    }));
 
     res.json(result);
   } catch (err) {
@@ -138,9 +147,7 @@ exports.getClassLineUpTotal = async (req, res) => {
   }
 };
 
-
-
-// 🔹 Cập nhật hoặc tạo mới điểm xếp hàng của lớp trong tuần
+// 🔹 Cập nhật hoặc tạo mới điểm xếp hàng của lớp trong tuần (thủ công)
 exports.updateWeeklyLineUpScore = async (req, res) => {
   try {
     const { className, weekNumber, lineUpScore } = req.body;
