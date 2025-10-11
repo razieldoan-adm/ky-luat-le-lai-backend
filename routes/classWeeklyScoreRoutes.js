@@ -2,13 +2,24 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/classWeeklyScoreController");
 
-// 🔹 Lấy danh sách điểm các lớp trong tuần hiện tại hoặc theo tuần cụ thể
+// 🔹 Lấy dữ liệu điểm các lớp theo tuần cụ thể
+// GET /api/weekly-scores/weekly?weekNumber=6
 router.get("/weekly", controller.getWeeklyScores);
 
-// 🔹 Cập nhật hoặc tạo mới điểm cho lớp trong tuần (chung cho tất cả các loại điểm)
+// 🔹 Cập nhật hoặc tạo mới điểm cho lớp trong tuần (dùng chung cho lineup, hygiene, violation,...)
+// POST /api/weekly-scores/update
 router.post("/update", controller.updateWeeklyScores);
 
-// 🔹 (Tuỳ chọn) Lấy tổng hợp điểm hoặc bảng xếp hạng
-router.get("/ranking", controller.getWeeklyRanking);
+// 🔹 Lấy danh sách các tuần đã có dữ liệu
+// GET /api/weekly-scores/weeks
+router.get("/weeks", controller.getWeeksWithScores);
+
+// 🔹 Xóa toàn bộ dữ liệu của một tuần
+// DELETE /api/weekly-scores/:weekNumber
+router.delete("/:weekNumber", controller.deleteWeeklyScores);
+
+// 🔹 Xuất Excel dữ liệu điểm của tuần
+// GET /api/weekly-scores/export/:weekNumber
+router.get("/export/:weekNumber", controller.exportWeeklyScores);
 
 module.exports = router;
