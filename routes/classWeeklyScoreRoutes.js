@@ -1,31 +1,14 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const classWeeklyScoreController = require('../controllers/classWeeklyScoreController');
+const controller = require("../controllers/classWeeklyScoreController");
 
-// GET dữ liệu tuần đã lưu
-router.get('/', classWeeklyScoreController.getWeeklyScores);
+// 🔹 Lấy danh sách điểm các lớp trong tuần hiện tại hoặc theo tuần cụ thể
+router.get("/weekly", controller.getWeeklyScores);
 
-// GET dữ liệu tạm (tính từ các bảng khác)
-router.get('/temp', classWeeklyScoreController.getTempWeeklyScores);
+// 🔹 Cập nhật hoặc tạo mới điểm cho lớp trong tuần (chung cho tất cả các loại điểm)
+router.post("/update", controller.updateWeeklyScore);
 
-// POST cập nhật lại toàn bộ điểm tuần
-router.post('/update/:weekNumber', classWeeklyScoreController.updateWeeklyScores);
-
-// POST lưu dữ liệu tuần
-router.post('/save', classWeeklyScoreController.saveWeeklyScores);
-
-// GET so sánh thay đổi
-router.get('/check-changes/:weekNumber', classWeeklyScoreController.checkChanges);
-
-// 📌 Bổ sung mới
-
-// Lấy danh sách tuần đã có dữ liệu
-router.get('/weeks', classWeeklyScoreController.getWeeksWithScores);
-
-// Xoá dữ liệu 1 tuần
-router.delete('/:weekNumber', classWeeklyScoreController.deleteWeeklyScores);
-
-// Xuất Excel
-router.get('/export/:weekNumber', classWeeklyScoreController.exportWeeklyScores);
+// 🔹 (Tuỳ chọn) Lấy tổng hợp điểm hoặc bảng xếp hạng
+router.get("/ranking", controller.getWeeklyRanking);
 
 module.exports = router;
