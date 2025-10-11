@@ -1,15 +1,23 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const controller = require('../controllers/classLineUpSummaryController');
+const controller = require("../controllers/classLineUpSummaryController");
 
-router.post('/', controller.createRecord);
-router.get('/weekly-summary', controller.getWeeklySummary);
-router.delete('/:id', controller.deleteRecord);
-router.get('/', controller.getAllRecords);
+// 🔹 Ghi nhận vi phạm xếp hàng (tạo mới)
+router.post("/", controller.createRecord);
 
-// ✅ Tổng hợp điểm theo lớp
-router.get("/summary-by-class", controller.getClassLineUpTotal);
+// 🔹 Lấy tất cả bản ghi (nếu cần)
+router.get("/", controller.getAllRecords);
 
-// ✅ Ghi điểm vào ClassWeeklyScore
-router.post("/update-weekly-lineup", controller.updateWeeklyLineUpScore);
+// 🔹 Lấy danh sách vi phạm trong tuần hiện tại hoặc theo tuần cụ thể
+router.get("/weekly", controller.getWeeklySummary);
+
+// 🔹 Xóa vi phạm
+router.delete("/:id", controller.deleteRecord);
+
+// 🔹 Tổng hợp điểm xếp hàng theo lớp trong tuần + tự lưu vào ClassWeeklyScore
+router.get("/total", controller.getClassLineUpTotal);
+
+// 🔹 Cập nhật hoặc tạo mới điểm xếp hàng theo lớp trong tuần (thủ công)
+router.post("/update-weekly-score", controller.updateWeeklyLineUpScore);
+
 module.exports = router;
