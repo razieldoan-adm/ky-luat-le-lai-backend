@@ -146,12 +146,18 @@ exports.getClassLineUpTotal = async (req, res) => {
 };
 
 // 🔹 Cập nhật thủ công điểm xếp hàng
+// controllers/classLineUpSummaryController.js
+const ClassWeeklyScore = require("../models/ClassWeeklyScore");
+
 exports.updateWeeklyLineUpScore = async (req, res) => {
   try {
     const { className, weekNumber, lineUpScore } = req.body;
-    if (!className || !weekNumber)
-      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc" });
 
+    if (!className || !weekNumber) {
+      return res.status(400).json({ message: "Thiếu className hoặc weekNumber" });
+    }
+
+    // ✅ Cập nhật hoặc tạo mới, chỉ thay đổi field lineUpScore
     const updated = await ClassWeeklyScore.findOneAndUpdate(
       { className, weekNumber },
       {
@@ -163,9 +169,12 @@ exports.updateWeeklyLineUpScore = async (req, res) => {
       { upsert: true, new: true }
     );
 
-    res.json(updated);
+    return res.json({
+      message: "✅ Đã cập nhật điểm lineup thành công",
+      data: updated,
+    });
   } catch (err) {
-    console.error("Lỗi updateWeeklyLineUpScore:", err);
-    res.status(500).json({ message: "Không thể cập nhật điểm xếp hàng" });
+    console.error("❌ Lỗi updateWeeklyLineUpScore:", err);
+    return res.status(500).json({ message: "Lỗi server", error: err.message });
   }
 };
