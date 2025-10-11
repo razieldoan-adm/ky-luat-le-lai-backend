@@ -146,8 +146,7 @@ exports.getClassLineUpTotal = async (req, res) => {
 };
 
 // 🔹 Cập nhật thủ công điểm xếp hàng
-// controllers/classLineUpSummaryController.js
-const ClassWeeklyScore = require("../models/ClassWeeklyScore");
+
 
 exports.updateWeeklyLineUpScore = async (req, res) => {
   try {
