@@ -51,33 +51,30 @@ exports.createRecord = async (req, res) => {
 // 🔹 Lấy danh sách vi phạm trong tuần
 exports.getWeeklySummary = async (req, res) => {
   try {
-    const { weekNumber } = req.query;
-    let targetWeek = null;
+    const { weekNumber, className } = req.query;
 
-    if (weekNumber) {
-      targetWeek = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
-    } else {
-      const today = new Date();
-      targetWeek = await AcademicWeek.findOne({
-        startDate: { $lte: today },
-        endDate: { $gte: today },
-      });
+    if (!weekNumber) {
+      return res.status(400).json({ message: "Thiếu tham số weekNumber" });
     }
 
-    if (!targetWeek) return res.status(404).json({ message: "Không xác định được tuần" });
+    const query = { weekNumber: Number(weekNumber) };
+    if (className) query.className = className;
 
-    const records = await ClassLineUpSummary.find({ weekNumber: targetWeek.weekNumber }).sort({ date: -1 });
-    res.json({
-      weekNumber: targetWeek.weekNumber,
-      startDate: targetWeek.startDate,
-      endDate: targetWeek.endDate,
+    const records = await ClassLineUpSummary.find(query);
+
+    res.status(200).json({
+      message: "Lấy danh sách lineup thành công",
       records,
     });
   } catch (err) {
     console.error("Lỗi getWeeklySummary:", err);
-    res.status(500).json({ message: "Không thể tải dữ liệu" });
+    res.status(500).json({
+      message: "Lỗi server khi lấy dữ liệu lineup",
+      error: err.message,
+    });
   }
 };
+
 
 // 🔹 Lấy tất cả bản ghi
 exports.getAllRecords = async (req, res) => {
