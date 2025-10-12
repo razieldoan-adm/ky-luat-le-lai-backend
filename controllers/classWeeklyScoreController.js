@@ -22,25 +22,41 @@ exports.getWeeklyScores = async (req, res) => {
  * POST /weekly-scores/update
  * Cập nhật điểm (gọi chung cho lineup, hygiene, violation,...)
  */
+const ClassWeeklyScore = require("../models/ClassWeeklyScore");
+
 exports.updateWeeklyScores = async (req, res) => {
   try {
-    const { className, weekNumber, ...scores } = req.body;
-    if (!className || !weekNumber)
+    const {
+      className,
+      weekNumber,
+      violationScore,
+      hygieneScore,
+      lineUpScore,
+      otherScore,
+    } = req.body;
+
+    if (!className || !weekNumber) {
       return res.status(400).json({ message: "Thiếu className hoặc weekNumber" });
-
-    let weekly = await ClassWeeklyScore.findOne({ className, weekNumber });
-    if (!weekly) weekly = new ClassWeeklyScore({ className, weekNumber });
-
-    // Cập nhật từng trường được truyền
-    for (const [key, value] of Object.entries(scores)) {
-      if (typeof value === "number") weekly[key] = value;
     }
 
+    // 🔹 Tìm bản ghi (theo lớp + tuần)
+    let weekly = await ClassWeeklyScore.findOne({ className, weekNumber });
+    if (!weekly) {
+      weekly = new ClassWeeklyScore({ className, weekNumber });
+    }
+
+    // 🔹 Cập nhật các trường nếu được truyền
+    if (typeof violationScore === "number") weekly.violationScore = violationScore;
+    if (typeof hygieneScore === "number") weekly.hygieneScore = hygieneScore;
+    if (typeof lineUpScore === "number") weekly.lineUpScore = lineUpScore;
+    if (typeof otherScore === "number") weekly.otherScore = otherScore;
+
     await weekly.save();
-    res.json({ message: "Đã cập nhật điểm", data: weekly });
+
+    res.json({ message: "✅ Đã lưu điểm tuần", data: weekly });
   } catch (err) {
-    console.error("Error in updateWeeklyScore:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ Lỗi trong updateWeeklyScores:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
