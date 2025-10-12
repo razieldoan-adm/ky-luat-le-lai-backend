@@ -24,30 +24,23 @@ exports.getWeeklyScores = async (req, res) => {
  */
 exports.updateWeeklyScores = async (req, res) => {
   try {
-    const {
-      className,
-      weekNumber,
-      violationScore,
-      hygieneScore,
-      lineUpScore,
-      otherScore,
-    } = req.body;
+    const { className, grade, weekNumber, hygieneScore, lineupScore, learningScore, violationScore } = req.body;
 
-    if (!className || !weekNumber) {
-      return res.status(400).json({ message: "Thiếu className hoặc weekNumber" });
+    if (!className || !weekNumber || !grade) {
+      return res.status(400).json({ message: "Thiếu className, weekNumber hoặc grade" });
     }
 
-    // 🔹 Tìm bản ghi (theo lớp + tuần)
+    // ✅ Tìm hoặc tạo mới
     let weekly = await ClassWeeklyScore.findOne({ className, weekNumber });
     if (!weekly) {
-      weekly = new ClassWeeklyScore({ className, weekNumber });
+      weekly = new ClassWeeklyScore({ className, grade, weekNumber });
     }
 
-    // 🔹 Cập nhật các trường nếu được truyền
-    if (typeof violationScore === "number") weekly.violationScore = violationScore;
-    if (typeof hygieneScore === "number") weekly.hygieneScore = hygieneScore;
-    if (typeof lineUpScore === "number") weekly.lineUpScore = lineUpScore;
-    if (typeof otherScore === "number") weekly.otherScore = otherScore;
+    // ✅ Gán 4 loại điểm
+    weekly.hygieneScore = hygieneScore ?? weekly.hygieneScore ?? 0;
+    weekly.lineupScore = lineupScore ?? weekly.lineupScore ?? 0;
+    weekly.learningScore = learningScore ?? weekly.learningScore ?? 0;
+    weekly.violationScore = violationScore ?? weekly.violationScore ?? 0;
 
     await weekly.save();
 
@@ -57,7 +50,6 @@ exports.updateWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
-
 /**
  * GET /weekly-scores/weeks
  * Lấy danh sách tuần đã có dữ liệu
