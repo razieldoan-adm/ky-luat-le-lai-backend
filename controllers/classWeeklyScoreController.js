@@ -22,8 +22,6 @@ exports.getWeeklyScores = async (req, res) => {
  * POST /weekly-scores/update
  * Cập nhật điểm (gọi chung cho lineup, hygiene, violation,...)
  */
-const ClassWeeklyScore = require("../models/ClassWeeklyScore");
-
 exports.updateWeeklyScores = async (req, res) => {
   try {
     const {
