@@ -96,30 +96,45 @@ exports.createViolation = async (req, res) => {
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
 exports.handleViolation = async (req, res) => {
   const { id } = req.params;
-  const { handled, handlingMethod, handledBy, handlingNote } = req.body;
+  const { handledBy } = req.body;
 
   try {
-    const updated = await Violation.findByIdAndUpdate(
-      id,
-      {
-        handled: handled ?? true,
-        handlingMethod: handlingMethod || '',
-        handledBy: handledBy || '',
-        handlingNote: handlingNote || '',
-      },
-      { new: true }
-    );
-
-    if (!updated) {
+    const violation = await Violation.findById(id);
+    if (!violation) {
       return res.status(404).json({ error: 'Không tìm thấy vi phạm' });
     }
 
-    res.json(updated);
+    // Đếm số lần vi phạm của học sinh (cùng tên hoặc id)
+    const count = await Violation.countDocuments({
+      studentName: violation.studentName,
+    });
+
+    // Xác định hình thức xử lý theo thứ tự vi phạm
+    let handlingMethod = '';
+    if (count === 1) handlingMethod = 'Nhắc nhở';
+    else if (count === 2) handlingMethod = 'Kiểm điểm';
+    else if (count === 3) handlingMethod = 'Chép phạt';
+    else if (count === 4) handlingMethod = 'Mời phụ huynh';
+    else handlingMethod = 'Hạ hạnh kiểm';
+
+    violation.handled = true;
+    violation.handledBy = handledBy;
+    violation.handlingMethod = handlingMethod;
+
+    await violation.save();
+
+    res.json({
+      message: 'Đã xử lý vi phạm',
+      handledBy,
+      handlingMethod,
+      count,
+    });
   } catch (err) {
     console.error('Lỗi khi xử lý vi phạm:', err);
     res.status(500).json({ error: 'Lỗi server khi xử lý vi phạm' });
   }
 };
+
 
 
 // ✅ Đánh dấu vi phạm đã xử lý
