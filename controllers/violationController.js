@@ -96,16 +96,16 @@ exports.createViolation = async (req, res) => {
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
 exports.handleViolation = async (req, res) => {
   const { id } = req.params;
-  const { handled, handlingMethod, handledBy, handlingNote } = req.body; // ✅ thêm 2 field
+  const { handled, handlingMethod, handledBy, handlingNote } = req.body;
 
   try {
     const updated = await Violation.findByIdAndUpdate(
       id,
       {
-        handled: handled ?? true, // ✅ nếu không gửi thì mặc định true
-        handlingMethod,
-        handledBy,
-        handlingNote,
+        handled: handled ?? true,
+        handlingMethod: handlingMethod || '',
+        handledBy: handledBy || '',
+        handlingNote: handlingNote || '',
       },
       { new: true }
     );
