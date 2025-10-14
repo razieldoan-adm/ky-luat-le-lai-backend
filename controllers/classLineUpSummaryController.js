@@ -38,6 +38,7 @@ exports.createRecord = async (req, res) => {
       date,
       weekNumber,
       scoreChange: Math.abs(defaultScore),
+      note: note || "", // ✅ thêm dòng này
     });
 
     await record.save();
