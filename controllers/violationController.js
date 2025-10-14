@@ -94,7 +94,7 @@ exports.createViolation = async (req, res) => {
 
 
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
-exports.handleProcessViolation = async (req, res) => {
+exports.handleViolation = async (req, res) => {
   const { id } = req.params;
   const { handledBy } = req.body; // chỉ gửi người xử lý khi click
 
