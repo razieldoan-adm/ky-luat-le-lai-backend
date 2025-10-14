@@ -96,42 +96,37 @@ exports.createViolation = async (req, res) => {
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
 exports.handleViolation = async (req, res) => {
   const { id } = req.params;
-  const { handledBy } = req.body;
+  const { handledBy } = req.body; // chỉ gửi người xử lý khi click
 
   try {
     const violation = await Violation.findById(id);
     if (!violation) {
-      return res.status(404).json({ error: 'Không tìm thấy vi phạm' });
+      return res.status(404).json({ error: "Không tìm thấy vi phạm" });
     }
 
-    // Đếm số lần vi phạm của học sinh (cùng tên hoặc id)
-    const count = await Violation.countDocuments({
-      studentName: violation.studentName,
-    });
-
-    // Xác định hình thức xử lý theo thứ tự vi phạm
-    let handlingMethod = '';
-    if (count === 1) handlingMethod = 'Nhắc nhở';
-    else if (count === 2) handlingMethod = 'Kiểm điểm';
-    else if (count === 3) handlingMethod = 'Chép phạt';
-    else if (count === 4) handlingMethod = 'Mời phụ huynh';
-    else handlingMethod = 'Hạ hạnh kiểm';
-
-    violation.handled = true;
+    // ✅ Luôn cho phép cập nhật người xử lý
     violation.handledBy = handledBy;
-    violation.handlingMethod = handlingMethod;
+    violation.handled = true; // đánh dấu là đã xử lý
+
+    // ⚙️ Xác định hình thức xử lý nếu chưa có
+    if (!violation.handlingMethod) {
+      const count = await Violation.countDocuments({ name: violation.name });
+
+      let method = "";
+      if (count === 1) method = "Nhắc nhở";
+      else if (count === 2) method = "Kiểm điểm";
+      else if (count === 3) method = "Chép phạt";
+      else if (count === 4) method = "Mời phụ huynh";
+      else method = "Hạ hạnh kiểm";
+
+      violation.handlingMethod = method;
+    }
 
     await violation.save();
-
-    res.json({
-      message: 'Đã xử lý vi phạm',
-      handledBy,
-      handlingMethod,
-      count,
-    });
+    res.json(violation);
   } catch (err) {
-    console.error('Lỗi khi xử lý vi phạm:', err);
-    res.status(500).json({ error: 'Lỗi server khi xử lý vi phạm' });
+    console.error("Lỗi khi xử lý vi phạm:", err);
+    res.status(500).json({ error: "Lỗi server khi xử lý vi phạm" });
   }
 };
 
