@@ -15,21 +15,20 @@ function getDefaultPenalty(setting) {
 // 🔹 Ghi nhận lỗi xếp hàng
 exports.createRecord = async (req, res) => {
   try {
-    const { className, studentName, violation, recorder, date } = req.body;
+    const { className, studentName, violation, recorder, date, note } = req.body;
 
-    // 🔹 1. Tìm tuần tương ứng theo ngày
+    // 1️⃣ Tìm tuần tương ứng theo ngày
     const targetWeek = await AcademicWeek.findOne({
       startDate: { $lte: date },
       endDate: { $gte: date },
     });
-
     const weekNumber = targetWeek ? targetWeek.weekNumber : null;
 
-    // 🔹 2. Lấy điểm mặc định từ Setting (hoặc 10 nếu chưa có)
+    // 2️⃣ Lấy điểm mặc định từ Setting (hoặc 10 nếu chưa có)
     const setting = await Setting.findOne();
     const defaultScore = setting?.lineUpScore || 10;
 
-    // 🔹 3. Tạo record (⚡ đổi sang điểm dương)
+    // 3️⃣ Tạo record (điểm luôn dương)
     const record = new ClassLineUpSummary({
       className,
       studentName,
@@ -38,16 +37,17 @@ exports.createRecord = async (req, res) => {
       date,
       weekNumber,
       scoreChange: Math.abs(defaultScore),
-      note: note || "", // ✅ thêm dòng này
+      note: note || "", // ⚡ bây giờ note đã được khai báo
     });
 
     await record.save();
     res.status(201).json(record);
   } catch (err) {
     console.error("Lỗi ghi nhận:", err);
-    res.status(500).json({ message: "Không thể ghi nhận vi phạm" });
+    res.status(500).json({ message: "Không thể ghi nhận vi phạm", error: err.message });
   }
 };
+
 
 // 🔹 Lấy danh sách vi phạm trong tuần
 exports.getWeeklySummary = async (req, res) => {
