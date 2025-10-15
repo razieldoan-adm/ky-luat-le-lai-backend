@@ -24,7 +24,15 @@ exports.getWeeklyScores = async (req, res) => {
  */
 exports.updateWeeklyScores = async (req, res) => {
   try {
-    const { className, grade, weekNumber, hygieneScore, lineupScore, learningScore, violationScore } = req.body;
+    const {
+      className,
+      grade,
+      weekNumber,
+      hygieneScore,
+      lineupScore,
+      attendanceScore,
+      violationScore,
+    } = req.body;
 
     if (!className || !weekNumber || !grade) {
       return res.status(400).json({ message: "Thiếu className, weekNumber hoặc grade" });
@@ -39,7 +47,7 @@ exports.updateWeeklyScores = async (req, res) => {
     // ✅ Gán 4 loại điểm
     weekly.hygieneScore = hygieneScore ?? weekly.hygieneScore ?? 0;
     weekly.lineupScore = lineupScore ?? weekly.lineupScore ?? 0;
-    weekly.learningScore = learningScore ?? weekly.learningScore ?? 0;
+    weekly.attendanceScore = attendanceScore ?? weekly.attendanceScore ?? 0;
     weekly.violationScore = violationScore ?? weekly.violationScore ?? 0;
 
     await weekly.save();
@@ -50,6 +58,7 @@ exports.updateWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
 /**
  * GET /weekly-scores/weeks
  * Lấy danh sách tuần đã có dữ liệu
