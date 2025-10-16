@@ -1,8 +1,20 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const controller = require('../controllers/classAttendanceSummaryController');
+const attendanceController = require("../controllers/classAttendanceSummaryController");
 
-router.get('/', controller.getByWeek);
-router.post('/', controller.saveSummaries);
-router.get('/by-week-and-class', controller.getByWeekAndClass);
+// 📋 Lấy danh sách học sinh theo lớp
+router.get("/students/:className", attendanceController.getStudentsByClass);
+
+// ➕ Ghi nhận nghỉ học
+router.post("/record", attendanceController.recordAttendance);
+
+// 📅 Lấy danh sách nghỉ học
+router.get("/list", attendanceController.getAttendanceList);
+
+// ❌ Xóa bản ghi nghỉ học
+router.delete("/:id", attendanceController.deleteAttendance);
+
+// ✅ Cập nhật nghỉ có phép / không phép
+router.put("/:id/excuse", attendanceController.updateExcuseStatus);
+
 module.exports = router;
