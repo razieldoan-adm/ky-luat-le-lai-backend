@@ -20,4 +20,6 @@ router.get('/students/multiple-violations/count', controller.countMultipleViolat
 // 📌 Lấy vi phạm theo học sinh
 router.get('/:name', controller.getViolationsByStudent);
 
+router.put('/:id', violationController.updateViolation);
+
 module.exports = router;
