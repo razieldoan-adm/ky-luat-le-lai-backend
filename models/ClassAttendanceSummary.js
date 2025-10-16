@@ -1,15 +1,17 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const classAttendanceSummarySchema = new mongoose.Schema({
   className: { type: String, required: true },
-  grade: { type: String, required: true },
-  weekNumber: { type: Number, required: true },
-  data: { type: [Number], required: true },
-  total: { type: Number, required: true },
-}, { timestamps: true });
+  studentId: { type: mongoose.Schema.Types.ObjectId, ref: "Student" },
+  studentName: { type: String, required: true },
+  date: { type: Date, required: true },
+  session: { type: String, enum: ["Sáng", "Chiều"], required: true },
+  recordedBy: { type: String, default: "GVCN" },
 
-// ✅ Đặt index ngay sau khi define schema
-classAttendanceSummarySchema.index({ className: 1, weekNumber: 1 }, { unique: true });
+  // ✅ Thêm cờ nghỉ có phép hay không
+  isExcused: { type: Boolean, default: false }, // false = không phép, true = có phép
 
-// Cuối cùng export model
-module.exports = mongoose.model('ClassAttendanceSummary', classAttendanceSummarySchema);
+  createdAt: { type: Date, default: Date.now },
+});
+
+module.exports = mongoose.model("ClassAttendanceSummary", classAttendanceSummarySchema);
