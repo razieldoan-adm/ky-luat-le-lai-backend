@@ -62,12 +62,17 @@ exports.getViolationsByStudent = async (req, res) => {
 
 // ➕ Ghi nhận vi phạm mới (lưu cả weekNumber)
 exports.createViolation = async (req, res) => {
-  const { className, description, handlingMethod, handledBy, handlingNote, weekNumber, time } = req.body;
-  const name = normalizeName(req.body.name);
-
   try {
+    const { className, description, handlingMethod, handledBy, handlingNote, weekNumber, time, name: rawName } = req.body;
+
+    if (!rawName || !description || !className) {
+      return res.status(400).json({ error: "Thiếu thông tin bắt buộc (name, description, className)" });
+    }
+
+    const name = normalizeName ? normalizeName(rawName) : rawName;
+
     const rule = await Rule.findOne({ title: description });
-    const penalty = rule ? rule.point : 0;
+    const penalty = rule && typeof rule.point === "number" ? rule.point : 0;
 
     const violation = new Violation({
       name,
@@ -75,22 +80,29 @@ exports.createViolation = async (req, res) => {
       description,
       penalty,
       handlingMethod,
-      handledBy,                      // ✅ thêm
-      handlingNote,                   // ✅ thêm
-      handled: !!handledBy,            // ✅ nếu có người xử lý thì đánh dấu true
+      handledBy,
+      handlingNote,
+      handled: !!handledBy,
       weekNumber,
       time: time ? new Date(time) : new Date(),
     });
 
     await violation.save();
-    await updateMeritScore(name, className);
+
+    try {
+      await updateMeritScore(name, className);
+    } catch (err) {
+      console.error("⚠️ Lỗi khi cập nhật điểm hạnh kiểm:", err.message);
+    }
 
     res.status(201).json(violation);
   } catch (error) {
-    console.error('Lỗi khi ghi nhận vi phạm:', error);
-    res.status(500).json({ error: 'Lỗi khi ghi nhận vi phạm.' });
+    console.error("❌ Lỗi khi ghi nhận vi phạm:", error.message);
+    console.error(error.stack);
+    res.status(500).json({ error: "Lỗi khi ghi nhận vi phạm (chi tiết xem server log)." });
   }
 };
+
 
 
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
