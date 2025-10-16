@@ -21,43 +21,45 @@ exports.generateWeeks = async (req, res) => {
   try {
     const setting = await SettingTime.findOne();
     if (!setting) {
-      return res.status(400).json({ message: 'Chưa cấu hình ngày bắt đầu/kết thúc năm học' });
+      return res.status(400).json({ message: '⚠️ Chưa cấu hình ngày bắt đầu / kết thúc năm học' });
     }
 
-    const start = dayjs(setting.startSchoolYear);
-    const end = dayjs(setting.endSchoolYear);
+    // 🔹 Lấy thời gian bắt đầu / kết thúc theo múi giờ VN
+    const start = dayjs(setting.startSchoolYear).tz('Asia/Ho_Chi_Minh').startOf('day');
+    const end = dayjs(setting.endSchoolYear).tz('Asia/Ho_Chi_Minh').endOf('day');
 
     let weeks = [];
-    let current = start;
+    let current = start.startOf('week').add(1, 'day'); // ép về Thứ 2 tuần đầu tiên
 
     while (current.isBefore(end)) {
-      let friday = current.weekday(5);
-      if (friday.isBefore(current, 'day')) {
-        friday = friday.add(7, 'day');
-      }
+      // Ngày bắt đầu tuần (Thứ 2)
+      const monday = current.startOf('day');
+      // Ngày kết thúc tuần (Chủ nhật)
+      let sunday = monday.add(6, 'day').endOf('day');
 
-      let thursdayNextWeek = friday.add(6, 'day');
-      if (thursdayNextWeek.isAfter(end)) {
-        thursdayNextWeek = end;
-      }
+      if (sunday.isAfter(end)) sunday = end;
 
       weeks.push({
-        startDate: friday.toDate(),
-        endDate: thursdayNextWeek.toDate(),
-        isStudyWeek: false
+        startDate: monday.toDate(),
+        endDate: sunday.toDate(),
+        isStudyWeek: false,
       });
 
-      current = friday.add(7, 'day');
+      // Sang tuần tiếp theo
+      current = monday.add(7, 'day');
     }
 
-    // Xoá hết tuần cũ và insert tuần mới
+    // 🔄 Ghi lại dữ liệu vào MongoDB
     await AcademicWeek.deleteMany({});
     await AcademicWeek.insertMany(weeks);
 
-    res.json({ message: 'Đã tạo xong danh sách tuần', weeks });
+    res.json({
+      message: `✅ Đã tạo ${weeks.length} tuần học (theo múi giờ Việt Nam)`,
+      weeks,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi server' });
+    console.error('❌ Lỗi generateWeeks:', err);
+    res.status(500).json({ message: 'Lỗi server khi tạo danh sách tuần.' });
   }
 };
 
