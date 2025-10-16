@@ -128,8 +128,10 @@ exports.handleViolation = async (req, res) => {
       if (count === 1) method = "Nhắc nhở";
       else if (count === 2) method = "Kiểm điểm";
       else if (count === 3) method = "Chép phạt";
-      else if (count === 4) method = "Mời phụ huynh";
-      else method = "Hạ hạnh kiểm";
+      else if (count === 4) method = "Báo phụ huynh";
+      else if (count === 5) method = "Mời phụ huynh";
+      else if (count === 6) method = "Tạm dừng việc học tập";
+      else method = "Xét hạ hạnh kiểm";
 
       violation.handlingMethod = method;
     }
