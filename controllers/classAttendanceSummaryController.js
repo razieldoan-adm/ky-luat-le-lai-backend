@@ -1,5 +1,6 @@
 const ClassAttendanceSummary = require("../models/ClassAttendanceSummary");
 const Student = require("../models/Student");
+const ClassWeeklyScore = require("../models/ClassWeeklyScore");
 
 // 📋 Lấy danh sách học sinh theo lớp
 exports.getStudentsByClass = async (req, res) => {
@@ -96,3 +97,51 @@ exports.updateExcuseStatus = async (req, res) => {
     res.status(500).json({ error: "Lỗi server khi cập nhật trạng thái" });
   }
 };
+
+// controllers/classAttendanceSummaryController.js
+
+
+exports.calculateAttendanceScore = async (req, res) => {
+  try {
+    const { className, grade, weekNumber } = req.body;
+
+    // ⚙️ Hệ số điểm mỗi lượt nghỉ (bạn có thể chỉnh)
+    const ATTENDANCE_MULTIPLIER = -2; // ví dụ: mỗi lượt nghỉ không phép = -2 điểm
+
+    if (!className || !weekNumber || !grade) {
+      return res.status(400).json({ message: "Thiếu className, weekNumber hoặc grade" });
+    }
+
+    // 📅 Lấy tất cả bản ghi nghỉ học của lớp trong tuần đó
+    const absences = await ClassAttendanceSummary.find({ className, weekNumber });
+
+    // Đếm số lượt nghỉ không phép
+    const unexcusedCount = absences.filter(a => a.excuse === false).length;
+
+    // ✅ Tính điểm chuyên cần: chỉ cần nhân hệ số
+    const attendanceScore = unexcusedCount * ATTENDANCE_MULTIPLIER;
+
+    // 🧾 Lưu vào bảng ClassWeeklyScore
+    let weekly = await ClassWeeklyScore.findOne({ className, weekNumber });
+    if (!weekly) {
+      weekly = new ClassWeeklyScore({ className, grade, weekNumber });
+    }
+
+    weekly.attendanceScore = attendanceScore;
+    await weekly.save();
+
+    res.json({
+      message: "✅ Đã tính điểm chuyên cần",
+      data: {
+        className,
+        weekNumber,
+        unexcusedCount,
+        attendanceScore,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Lỗi tính điểm chuyên cần:", error);
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};
+
