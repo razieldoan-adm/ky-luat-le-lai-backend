@@ -19,4 +19,7 @@ router.put("/:id/excuse", attendanceController.updateExcuseStatus);
 
 router.post("/calculate-attendance", attendanceController.calculateAttendanceScore);
 
+// ✅ Thống kê chuyên cần theo tuần
+router.get("/weekly", attendanceController.getWeeklyAttendanceSummary);
+
 module.exports = router;
