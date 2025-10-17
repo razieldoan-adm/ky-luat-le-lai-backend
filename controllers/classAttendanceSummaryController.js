@@ -144,7 +144,6 @@ exports.calculateAttendanceScore = async (req, res) => {
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 };
-const ClassAttendanceSummary = require("../models/ClassAttendanceSummary");
 
 // 📊 Lấy thống kê chuyên cần theo tuần
 exports.getWeeklyAttendanceSummary = async (req, res) => {
