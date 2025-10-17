@@ -17,4 +17,6 @@ router.delete("/:id", attendanceController.deleteAttendance);
 // ✅ Cập nhật nghỉ có phép / không phép
 router.put("/:id/excuse", attendanceController.updateExcuseStatus);
 
+router.post("/calculate-attendance", attendanceController.calculateAttendanceScore);
+
 module.exports = router;
