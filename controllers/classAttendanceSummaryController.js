@@ -144,4 +144,40 @@ exports.calculateAttendanceScore = async (req, res) => {
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 };
+const ClassAttendanceSummary = require("../models/ClassAttendanceSummary");
+
+// 📊 Lấy thống kê chuyên cần theo tuần
+exports.getWeeklyAttendanceSummary = async (req, res) => {
+  try {
+    const { weekNumber } = req.query;
+    if (!weekNumber) {
+      return res.status(400).json({ message: "Thiếu weekNumber" });
+    }
+
+    // Lấy tất cả bản ghi trong tuần đó
+    const records = await ClassAttendanceSummary.find({ weekNumber });
+
+    // Gom nhóm theo lớp
+    const grouped = {};
+    records.forEach((r) => {
+      if (!grouped[r.className]) grouped[r.className] = { total: 0, unexcused: 0 };
+      grouped[r.className].total++;
+
+      // Đếm nghỉ không phép
+      if (!r.present && !r.excuse) grouped[r.className].unexcused++;
+    });
+
+    // Chuyển thành mảng
+    const summary = Object.entries(grouped).map(([className, data]) => ({
+      className,
+      total: data.total,
+      unexcused: data.unexcused,
+    }));
+
+    res.json({ records: summary });
+  } catch (err) {
+    console.error("❌ Lỗi getWeeklyAttendanceSummary:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
 
