@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const attendanceController = require("../controllers/attendanceController");
+const attendanceController = require("../controllers/classAttendanceSummaryController");
 
 // Ghi nhận học sinh nghỉ học
 router.post("/record", attendanceController.recordAbsence);
