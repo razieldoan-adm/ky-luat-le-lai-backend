@@ -1,25 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const attendanceController = require("../controllers/classAttendanceSummaryController");
+const attendanceController = require("../controllers/attendanceController");
 
-// 📋 Lấy danh sách học sinh theo lớp
-router.get("/students/:className", attendanceController.getStudentsByClass);
+// Ghi nhận học sinh nghỉ học
+router.post("/add", attendanceController.addAttendanceRecord);
 
-// ➕ Ghi nhận nghỉ học
-router.post("/record", attendanceController.recordAttendance);
+// Duyệt phép
+router.put("/approve/:id", attendanceController.approveAttendance);
 
-// 📅 Lấy danh sách nghỉ học
-router.get("/list", attendanceController.getAttendanceList);
+// Lấy danh sách nghỉ học (theo ngày hoặc tuần)
+router.get("/", attendanceController.getAttendanceList);
 
-// ❌ Xóa bản ghi nghỉ học
-router.delete("/:id", attendanceController.deleteAttendance);
-
-// ✅ Cập nhật nghỉ có phép / không phép
-router.put("/:id/excuse", attendanceController.updateExcuseStatus);
-
-router.post("/calculate-attendance", attendanceController.calculateAttendanceScore);
-
-// ✅ Thống kê chuyên cần theo tuần
-router.get("/weekly", attendanceController.getWeeklyUnexcusedAbsenceCount);
+// Thống kê nghỉ không phép theo tuần
+router.get("/weekly-summary", attendanceController.getWeeklyUnexcusedAbsenceCount);
 
 module.exports = router;
