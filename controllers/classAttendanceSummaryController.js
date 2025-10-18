@@ -1,77 +1,61 @@
+// controllers/attendanceController.js
 const Attendance = require("../models/Attendance");
+const ClassWeeklyScore = require("../models/ClassWeeklyScore");
+const Setting = require("../models/Setting");
 
-// Tạo bản ghi nghỉ học
-exports.createAttendance = async (req, res) => {
+// ✅ Đếm số lượt nghỉ học không phép của 1 lớp trong 1 tuần và cập nhật điểm phạt
+exports.getWeeklyUnexcusedAbsenceCount = async (req, res) => {
   try {
-    const { studentId, studentName, className, date, permission } = req.body;
-
-    if (!studentId || !studentName || !className || !date) {
-      return res.status(400).json({ message: "Thiếu dữ liệu bắt buộc" });
+    const { className, grade, weekNumber } = req.query;
+    if (!className || !grade || !weekNumber) {
+      return res.status(400).json({ message: "Thiếu className, grade hoặc weekNumber" });
     }
 
-    const attendance = new Attendance({
-      student: studentId,
-      studentName,
+    // 🔍 Đếm số lượt nghỉ không phép trong tuần
+    const unexcusedCount = await Attendance.countDocuments({
       className,
-      date: new Date(date),
-      permission: permission === "co-phep" ? "co-phep" : "khong-phep",
+      grade,
+      weekNumber,
+      permission: false, // false = nghỉ không phép
     });
 
-    await attendance.save();
-    res.status(201).json({ message: "Đã ghi nhận nghỉ học", attendance });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Lỗi server khi ghi nhận nghỉ học" });
-  }
-};
+    // 🔍 Lấy hệ số điểm phạt từ bảng Setting (hoặc mặc định = 5)
+    const setting = await Setting.findOne({});
+    const attendanceCoefficient =
+      setting?.attendanceCoefficient !== undefined
+        ? setting.attendanceCoefficient
+        : 5;
 
-// Cập nhật trạng thái nghỉ học (duyệt phép / không phép)
-exports.updateAttendance = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { permission } = req.body;
+    // 🔢 Tính điểm phạt cho lớp
+    const violationScore = unexcusedCount * attendanceCoefficient;
 
-    const attendance = await Attendance.findById(id);
-    if (!attendance) {
-      return res.status(404).json({ message: "Không tìm thấy bản ghi" });
+    // ✅ Cập nhật hoặc tạo mới bản ghi ClassWeeklyScore
+    let weekly = await ClassWeeklyScore.findOne({ className, grade, weekNumber });
+
+    if (!weekly) {
+      weekly = new ClassWeeklyScore({
+        className,
+        grade,
+        weekNumber,
+        attendanceScore: violationScore, // hoặc violationScore nếu bạn dùng trường này
+      });
+    } else {
+      weekly.attendanceScore = violationScore;
     }
 
-    attendance.permission = permission === "co-phep" ? "co-phep" : "khong-phep";
-    await attendance.save();
+    await weekly.save();
 
-    res.json({ message: "Đã cập nhật trạng thái", attendance });
+    return res.status(200).json({
+      message: "Đã tính và cập nhật điểm phạt nghỉ học",
+      className,
+      grade,
+      weekNumber,
+      unexcusedCount,
+      attendanceCoefficient,
+      violationScore,
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Lỗi server khi cập nhật nghỉ học" });
-  }
-};
-
-// Xoá bản ghi nghỉ học
-exports.deleteAttendance = async (req, res) => {
-  try {
-    const { id } = req.params;
-    await Attendance.findByIdAndDelete(id);
-    res.json({ message: "Đã xoá bản ghi nghỉ học" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Lỗi server khi xoá nghỉ học" });
-  }
-};
-
-// Lấy danh sách nghỉ học của lớp theo ngày hoặc tuần
-exports.getAttendanceByClass = async (req, res) => {
-  try {
-    const { className, startDate, endDate } = req.query;
-
-    const filter = { className };
-    if (startDate && endDate) {
-      filter.date = { $gte: new Date(startDate), $lte: new Date(endDate) };
-    }
-
-    const records = await Attendance.find(filter).sort({ date: -1 });
-    res.json(records);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Lỗi server khi lấy danh sách nghỉ học" });
+    console.error("Lỗi khi thống kê nghỉ không phép:", error);
+    res.status(500).json({ message: "Lỗi server khi thống kê nghỉ không phép", error });
   }
 };
