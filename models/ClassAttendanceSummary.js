@@ -1,3 +1,4 @@
+// models/ClassAttendanceSummary.js
 const mongoose = require("mongoose");
 
 const ClassAttendanceSummarySchema = new mongoose.Schema({
@@ -5,10 +6,14 @@ const ClassAttendanceSummarySchema = new mongoose.Schema({
   studentName: { type: String, required: true },
   className: { type: String, required: true },
   grade: { type: String, required: true },
-  date: { type: String, required: true }, // yyyy-mm-dd
-  session: { type: String, enum: ["Sáng", "Chiều"], required: true },
-  permission: { type: Boolean, default: false },
-  weekNumber: { type: Number, required: true },
+  date: { type: String, required: true }, // YYYY-MM-DD
+  session: { type: String, enum: ["sáng", "chiều"], required: true },
+  permission: { type: Boolean, default: false }, // false = không phép
 });
+
+ClassAttendanceSummarySchema.index(
+  { studentId: 1, date: 1, session: 1 },
+  { unique: true }
+);
 
 module.exports = mongoose.model("ClassAttendanceSummary", ClassAttendanceSummarySchema);
