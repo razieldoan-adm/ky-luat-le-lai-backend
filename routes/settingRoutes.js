@@ -4,6 +4,6 @@ const setting = require('../controllers/settingController');
 
 router.get('/', setting.getSettings);
 router.put('/', setting.updateSettings);
-router.put("/update", settingController.updateSetting);
+router.put("/update", setting.updateSetting);
 
 module.exports = router;
