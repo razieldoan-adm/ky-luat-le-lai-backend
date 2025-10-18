@@ -44,3 +44,18 @@ exports.updateSettings = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server khi cập nhật settings.' });
   }
 };
+
+exports.updateSetting = async (req, res) => {
+  try {
+    const { limitGVCNHandling } = req.body;
+    let setting = await Setting.findOne();
+    if (!setting) setting = new Setting({});
+    setting.limitGVCNHandling = limitGVCNHandling;
+    await setting.save();
+    res.json({ message: "Cập nhật thành công", setting });
+  } catch (err) {
+    console.error("Lỗi khi cập nhật setting:", err);
+    res.status(500).json({ message: "Lỗi server" });
+  }
+};
+
