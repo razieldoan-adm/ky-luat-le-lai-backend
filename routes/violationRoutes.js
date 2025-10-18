@@ -17,12 +17,14 @@ router.get('/count', controller.getViolationCount);
 router.get('/unhandled/count', controller.getUnhandledViolationCount);
 router.get('/students/multiple-violations/count', controller.countMultipleViolations);
 
-// 📌 Lấy vi phạm theo học sinh
-router.get('/:name', controller.getViolationsByStudent);
+
 
 router.put('/:id', controller.updateViolation);
 
 router.get("/gvcn-limit", controller.getGVCNHandlingLimit);
 router.post("/gvcn-limit", controller.toggleGVCNHandlingLimit);
+
+// 📌 Lấy vi phạm theo học sinh
+router.get('/:name', controller.getViolationsByStudent);
 
 module.exports = router;
