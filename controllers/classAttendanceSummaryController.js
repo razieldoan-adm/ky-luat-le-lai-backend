@@ -1,61 +1,129 @@
-// controllers/attendanceController.js
 const Attendance = require("../models/ClassAttendanceSummary");
 const ClassWeeklyScore = require("../models/ClassWeeklyScore");
 const Setting = require("../models/Setting");
 
-// ✅ Đếm số lượt nghỉ học không phép của 1 lớp trong 1 tuần và cập nhật điểm phạt
-exports.getWeeklyUnexcusedAbsenceCount = async (req, res) => {
+/** 🟢 Ghi nhận học sinh nghỉ học (mặc định không phép) */
+exports.recordAttendance = async (req, res) => {
   try {
-    const { className, grade, weekNumber } = req.query;
-    if (!className || !grade || !weekNumber) {
-      return res.status(400).json({ message: "Thiếu className, grade hoặc weekNumber" });
+    const { studentName, studentId, className, grade, weekNumber, date } = req.body;
+
+    if (!studentName || !className || !grade || !weekNumber) {
+      return res.status(400).json({ message: "Thiếu dữ liệu cần thiết" });
     }
 
-    // 🔍 Đếm số lượt nghỉ không phép trong tuần
+    const record = new Attendance({
+      studentName,
+      studentId,
+      className,
+      grade,
+      weekNumber,
+      date,
+      permission: false, // mặc định không phép
+    });
+
+    await record.save();
+
+    // 🔄 Cập nhật điểm chuyên cần tự động
+    await updateWeeklyAttendanceScore(className, grade, weekNumber);
+
+    res.status(201).json({ message: "Đã ghi nhận học sinh nghỉ học (không phép)", record });
+  } catch (error) {
+    console.error("❌ Lỗi ghi nhận nghỉ học:", error);
+    res.status(500).json({ message: "Lỗi server khi ghi nhận nghỉ học" });
+  }
+};
+
+/** 🟡 GVCN duyệt chuyển sang nghỉ có phép */
+exports.approvePermission = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const attendance = await Attendance.findById(id);
+    if (!attendance) {
+      return res.status(404).json({ message: "Không tìm thấy bản ghi nghỉ học" });
+    }
+
+    attendance.permission = true;
+    await attendance.save();
+
+    // 🔄 Cập nhật lại điểm tuần
+    await updateWeeklyAttendanceScore(attendance.className, attendance.grade, attendance.weekNumber);
+
+    res.json({ message: "Đã duyệt nghỉ có phép cho học sinh", attendance });
+  } catch (error) {
+    console.error("❌ Lỗi khi duyệt nghỉ có phép:", error);
+    res.status(500).json({ message: "Lỗi server khi duyệt nghỉ có phép" });
+  }
+};
+
+/** 📊 Lấy danh sách nghỉ theo tuần/lớp */
+exports.getWeeklyAttendance = async (req, res) => {
+  try {
+    const { className, grade, weekNumber } = req.query;
+
+    const filter = {};
+    if (className) filter.className = className;
+    if (grade) filter.grade = grade;
+    if (weekNumber) filter.weekNumber = weekNumber;
+
+    const list = await Attendance.find(filter).sort({ date: 1 });
+
+    res.json(list);
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy danh sách nghỉ:", error);
+    res.status(500).json({ message: "Lỗi server khi lấy danh sách nghỉ" });
+  }
+};
+
+/** ⚙️ Hàm nội bộ - Tính điểm chuyên cần và cập nhật ClassWeeklyScore */
+const updateWeeklyAttendanceScore = async (className, grade, weekNumber) => {
+  try {
+    // Đếm số lượt nghỉ không phép
     const unexcusedCount = await Attendance.countDocuments({
       className,
       grade,
       weekNumber,
-      permission: false, // false = nghỉ không phép
+      permission: false,
     });
 
-    // 🔍 Lấy hệ số điểm phạt từ bảng Setting (hoặc mặc định = 5)
+    // Lấy hệ số điểm phạt từ Setting
     const setting = await Setting.findOne({});
     const attendanceCoefficient =
-      setting?.attendanceCoefficient !== undefined
-        ? setting.attendanceCoefficient
-        : 5;
+      setting?.attendanceCoefficient !== undefined ? setting.attendanceCoefficient : 5;
 
-    // 🔢 Tính điểm phạt cho lớp
-    const violationScore = unexcusedCount * attendanceCoefficient;
+    // Tính điểm phạt
+    const attendanceScore = unexcusedCount * attendanceCoefficient;
 
-    // ✅ Cập nhật hoặc tạo mới bản ghi ClassWeeklyScore
+    // Cập nhật ClassWeeklyScore
     let weekly = await ClassWeeklyScore.findOne({ className, grade, weekNumber });
 
     if (!weekly) {
-      weekly = new ClassWeeklyScore({
-        className,
-        grade,
-        weekNumber,
-        attendanceScore: violationScore, // hoặc violationScore nếu bạn dùng trường này
-      });
+      weekly = new ClassWeeklyScore({ className, grade, weekNumber, attendanceScore });
     } else {
-      weekly.attendanceScore = violationScore;
+      weekly.attendanceScore = attendanceScore;
     }
 
     await weekly.save();
+  } catch (error) {
+    console.error("⚠️ Lỗi khi cập nhật điểm chuyên cần:", error);
+  }
+};
 
-    return res.status(200).json({
-      message: "Đã tính và cập nhật điểm phạt nghỉ học",
+exports.getWeeklyUnexcusedAbsenceCount = async (req, res) => {
+  try {
+    const { className, grade, weekNumber } = req.query;
+    if (!className || !grade || !weekNumber)
+      return res.status(400).json({ message: "Thiếu className, grade hoặc weekNumber" });
+
+    const unexcusedCount = await Attendance.countDocuments({
       className,
       grade,
       weekNumber,
-      unexcusedCount,
-      attendanceCoefficient,
-      violationScore,
+      permission: false,
     });
+
+    res.json({ className, grade, weekNumber, unexcusedCount });
   } catch (error) {
-    console.error("Lỗi khi thống kê nghỉ không phép:", error);
-    res.status(500).json({ message: "Lỗi server khi thống kê nghỉ không phép", error });
+    console.error("❌ Lỗi khi đếm nghỉ không phép:", error);
+    res.status(500).json({ message: "Lỗi server khi đếm nghỉ không phép" });
   }
 };
