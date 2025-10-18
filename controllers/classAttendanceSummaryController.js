@@ -1,123 +1,105 @@
 const Attendance = require("../models/ClassAttendanceSummary");
-const ClassWeeklyScore = require("../models/ClassWeeklyScore");
-const Setting = require("../models/Setting");
 const dayjs = require("dayjs");
 
-// 🟩 1. Ghi nhận học sinh nghỉ học (ngày tùy chọn, mặc định hôm nay)
-exports.addAttendanceRecord = async (req, res) => {
+// ✅ Tạo mới bản ghi nghỉ học
+exports.recordAbsence = async (req, res) => {
   try {
-    const { className, grade, studentName, date, session } = req.body;
-    if (!className || !grade || !studentName || !session)
-      return res.status(400).json({ message: "Thiếu dữ liệu cần thiết" });
+    const { studentId, studentName, className, grade, date, session } = req.body;
 
-    // nếu không truyền ngày, mặc định là hôm nay
-    const targetDate = date || dayjs().format("YYYY-MM-DD");
-
-    // Tự tính weekNumber theo ngày (đảm bảo đồng bộ với hệ thống tuần)
-    const startOfYear = dayjs(targetDate).startOf("year");
-    const weekNumber = dayjs(targetDate).diff(startOfYear, "week") + 1;
-
-    // Kiểm tra trùng bản ghi
-    const existing = await Attendance.findOne({
-      className,
-      grade,
-      studentName,
-      date: targetDate,
-      session,
-    });
-
-    if (existing) {
-      return res.status(400).json({ message: "Học sinh này đã được ghi nghỉ buổi này" });
+    if (!studentId || !studentName || !className || !grade || !session) {
+      return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
     }
 
-    const record = new Attendance({
+    const formattedDate = date
+      ? dayjs(date).format("YYYY-MM-DD")
+      : dayjs().format("YYYY-MM-DD");
+
+    const existing = await Attendance.findOne({
+      studentId,
+      date: formattedDate,
+      session,
+    });
+    if (existing) {
+      return res.status(400).json({ message: "Đã ghi nhận học sinh này trong buổi này." });
+    }
+
+    const attendance = new Attendance({
+      studentId,
+      studentName,
       className,
       grade,
-      studentName,
-      date: targetDate,
+      date: formattedDate,
       session,
       permission: false,
-      weekNumber,
     });
 
-    await record.save();
-    res.status(201).json({ message: "Đã ghi nhận học sinh nghỉ học", record });
+    await attendance.save();
+    res.status(201).json({ message: "Đã ghi nhận nghỉ học.", attendance });
   } catch (error) {
-    console.error("❌ Lỗi khi thêm nghỉ học:", error);
-    res.status(500).json({ message: "Lỗi server khi thêm nghỉ học", error });
+    console.error("❌ Lỗi khi ghi nhận nghỉ học:", error);
+    res.status(500).json({ message: "Lỗi server khi ghi nhận nghỉ học", error });
   }
 };
 
-// 🟨 2. Duyệt phép (GVCN hoặc Giám thị)
-exports.approveAttendance = async (req, res) => {
+// ✅ Lấy danh sách nghỉ học theo ngày
+exports.getByDate = async (req, res) => {
   try {
-    const { id } = req.params;
-    const record = await Attendance.findById(id);
-    if (!record) return res.status(404).json({ message: "Không tìm thấy bản ghi" });
+    const { className, grade, date } = req.query;
+    if (!className || !grade || !date) {
+      return res.status(400).json({ message: "Thiếu className, grade hoặc date." });
+    }
 
-    record.permission = true;
-    await record.save();
+    const formattedDate = dayjs(date).format("YYYY-MM-DD");
 
-    res.status(200).json({ message: "Đã duyệt phép cho học sinh", record });
-  } catch (error) {
-    console.error("❌ Lỗi khi duyệt phép:", error);
-    res.status(500).json({ message: "Lỗi server khi duyệt phép", error });
-  }
-};
+    const records = await Attendance.find({ className, grade, date: formattedDate }).sort({
+      session: 1,
+      studentName: 1,
+    });
 
-// 🟦 3. Lấy danh sách nghỉ học (ngày hoặc tuần)
-exports.getAttendanceList = async (req, res) => {
-  try {
-    const { className, viewMode, date, weekNumber } = req.query;
-    let filter = {};
-
-    if (className) filter.className = className;
-    if (viewMode === "week" && weekNumber)
-      filter.weekNumber = Number(weekNumber);
-    else if (date)
-      filter.date = date;
-
-    const records = await Attendance.find(filter).sort({ date: -1 });
     res.status(200).json(records);
   } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách nghỉ học:", error);
+    console.error("❌ Lỗi khi lấy danh sách theo ngày:", error);
     res.status(500).json({ message: "Lỗi server khi lấy danh sách nghỉ học", error });
   }
 };
 
-// 🟥 4. Tính điểm phạt nghỉ học không phép trong tuần
-exports.getWeeklyUnexcusedAbsenceCount = async (req, res) => {
+// ✅ Lấy danh sách nghỉ học theo tuần
+exports.getByWeek = async (req, res) => {
   try {
-    const { className, grade, weekNumber } = req.query;
-    if (!className || !grade || !weekNumber)
-      return res.status(400).json({ message: "Thiếu className, grade hoặc weekNumber" });
+    const { className, grade, startDate, endDate } = req.query;
+    if (!className || !grade || !startDate || !endDate) {
+      return res.status(400).json({ message: "Thiếu className, grade, startDate hoặc endDate." });
+    }
 
-    const unexcusedCount = await Attendance.countDocuments({
+    const start = dayjs(startDate).format("YYYY-MM-DD");
+    const end = dayjs(endDate).format("YYYY-MM-DD");
+
+    const records = await Attendance.find({
       className,
       grade,
-      weekNumber,
-      permission: false,
-    });
+      date: { $gte: start, $lte: end },
+    }).sort({ date: 1, session: 1, studentName: 1 });
 
-    const setting = await Setting.findOne({});
-    const coef = setting?.attendanceCoefficient ?? 5;
-    const violationScore = unexcusedCount * coef;
-
-    let weekly = await ClassWeeklyScore.findOne({ className, grade, weekNumber });
-    if (!weekly)
-      weekly = new ClassWeeklyScore({ className, grade, weekNumber, attendanceScore: violationScore });
-    else weekly.attendanceScore = violationScore;
-
-    await weekly.save();
-
-    res.status(200).json({
-      message: "Đã tính điểm phạt nghỉ học",
-      unexcusedCount,
-      attendanceCoefficient: coef,
-      violationScore,
-    });
+    res.status(200).json(records);
   } catch (error) {
-    console.error("❌ Lỗi khi tính điểm phạt:", error);
-    res.status(500).json({ message: "Lỗi server khi tính điểm phạt", error });
+    console.error("❌ Lỗi khi lấy danh sách theo tuần:", error);
+    res.status(500).json({ message: "Lỗi server khi lấy danh sách nghỉ học theo tuần", error });
+  }
+};
+
+// ✅ (Tùy chọn sau này) Cập nhật duyệt có phép
+exports.approvePermission = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const record = await Attendance.findById(id);
+    if (!record) return res.status(404).json({ message: "Không tìm thấy bản ghi." });
+
+    record.permission = true;
+    await record.save();
+
+    res.status(200).json({ message: "Đã duyệt nghỉ có phép.", record });
+  } catch (error) {
+    console.error("❌ Lỗi khi duyệt nghỉ có phép:", error);
+    res.status(500).json({ message: "Lỗi server khi duyệt nghỉ có phép", error });
   }
 };
