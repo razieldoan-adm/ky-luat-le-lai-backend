@@ -108,7 +108,7 @@ exports.createViolation = async (req, res) => {
 // 🛠️ Xử lý vi phạm (cập nhật handled + handlingMethod)
 exports.handleViolation = async (req, res) => {
   const { id } = req.params;
-  const { handledBy } = req.body; // chỉ gửi người xử lý khi click
+  const { handledBy, role } = req.body; // ⚠️ Thêm role (GVCN, PGT, BGH...)
 
   try {
     const violation = await Violation.findById(id);
@@ -116,9 +116,28 @@ exports.handleViolation = async (req, res) => {
       return res.status(404).json({ error: "Không tìm thấy vi phạm" });
     }
 
+    // 🔹 Lấy tuần và học sinh để kiểm tra giới hạn
+    const weekNumber = violation.weekNumber;
+    const studentId = violation.studentId;
+
+    // 🔹 Lấy cài đặt hệ thống
+    const setting = await Setting.findOne();
+    const limitGVCN = setting?.limitGVCNHandling ?? false;
+
+    // 🔹 Nếu bật giới hạn và là GVCN thì kiểm tra
+    if (limitGVCN && role === "GVCN") {
+      const count = await Violation.countDocuments({ studentId, weekNumber });
+      if (count >= 2) {
+        return res.status(403).json({
+          message:
+            "Học sinh đã vi phạm ≥ 2 lần trong tuần này. GVCN không được phép xử lý thêm.",
+        });
+      }
+    }
+
     // ✅ Luôn cho phép cập nhật người xử lý
     violation.handledBy = handledBy;
-    violation.handled = true; // đánh dấu là đã xử lý
+    violation.handled = true;
 
     // ⚙️ Xác định hình thức xử lý nếu chưa có
     if (!violation.handlingMethod) {
@@ -306,5 +325,29 @@ exports.updateViolation = async (req, res) => {
   } catch (error) {
     console.error("❌ Lỗi khi cập nhật vi phạm:", error);
     res.status(500).json({ error: "Lỗi server khi cập nhật vi phạm." });
+  }
+};
+exports.getGVCNHandlingLimit = async (req, res) => {
+  try {
+    const setting = await Setting.findOne();
+    res.json({ limitGVCNHandling: setting?.limitGVCNHandling ?? false });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Lỗi khi lấy cài đặt giới hạn" });
+  }
+};
+
+// ✅ API bật/tắt giới hạn xử lý của GVCN
+exports.toggleGVCNHandlingLimit = async (req, res) => {
+  try {
+    const { value } = req.body; // true/false
+    let setting = await Setting.findOne();
+    if (!setting) setting = new Setting();
+    setting.limitGVCNHandling = value;
+    await setting.save();
+    res.json({ success: true, limitGVCNHandling: value });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Lỗi cập nhật giới hạn GVCN" });
   }
 };
