@@ -1,5 +1,5 @@
 // controllers/attendanceController.js
-const Attendance = require("../models/Attendance");
+const Attendance = require("../models/ClassAttendanceSummary");
 const ClassWeeklyScore = require("../models/ClassWeeklyScore");
 const Setting = require("../models/Setting");
 
