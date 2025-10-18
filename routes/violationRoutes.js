@@ -22,7 +22,7 @@ router.get('/:name', controller.getViolationsByStudent);
 
 router.put('/:id', controller.updateViolation);
 
-router.get("/gvcn-limit", violationController.getGVCNHandlingLimit);
-router.post("/gvcn-limit", violationController.toggleGVCNHandlingLimit);
+router.get("/gvcn-limit", controller.getGVCNHandlingLimit);
+router.post("/gvcn-limit", controller.toggleGVCNHandlingLimit);
 
 module.exports = router;
