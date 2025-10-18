@@ -3,15 +3,15 @@ const router = express.Router();
 const attendanceController = require("../controllers/attendanceController");
 
 // Ghi nhận học sinh nghỉ học
-router.post("/add", attendanceController.addAttendanceRecord);
+router.post("/record", attendanceController.recordAbsence);
 
-// Duyệt phép
-router.put("/approve/:id", attendanceController.approveAttendance);
+// Xem danh sách nghỉ học theo ngày
+router.get("/by-date", attendanceController.getByDate);
 
-// Lấy danh sách nghỉ học (theo ngày hoặc tuần)
-router.get("/", attendanceController.getAttendanceList);
+// Xem danh sách nghỉ học theo tuần
+router.get("/by-week", attendanceController.getByWeek);
 
-// Thống kê nghỉ không phép theo tuần
-router.get("/weekly-summary", attendanceController.getWeeklyUnexcusedAbsenceCount);
+// Duyệt nghỉ có phép (dành cho GVCN)
+router.put("/approve/:id", attendanceController.approvePermission);
 
 module.exports = router;
