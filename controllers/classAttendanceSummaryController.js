@@ -50,7 +50,10 @@ exports.getByDate = async (req, res) => {
     }
 
     const formattedDate = dayjs(date).format("YYYY-MM-DD");
-
+    
+    const filter = { className, date: formattedDate };
+    if (grade) filter.grade = grade; // nếu có thì thêm, không bắt buộc
+    
     const records = await Attendance.find({ className, grade, date: formattedDate }).sort({
       session: 1,
       studentName: 1,
@@ -67,25 +70,36 @@ exports.getByDate = async (req, res) => {
 exports.getByWeek = async (req, res) => {
   try {
     const { className, grade, startDate, endDate } = req.query;
-    if (!className || !grade || !startDate || !endDate) {
-      return res.status(400).json({ message: "Thiếu className, grade, startDate hoặc endDate." });
+    if (!className || !startDate || !endDate) {
+      return res.status(400).json({ message: "Thiếu className, startDate hoặc endDate." });
     }
 
     const start = dayjs(startDate).format("YYYY-MM-DD");
     const end = dayjs(endDate).format("YYYY-MM-DD");
 
-    const records = await Attendance.find({
+    const filter = {
       className,
-      grade,
       date: { $gte: start, $lte: end },
-    }).sort({ date: 1, session: 1, studentName: 1 });
+    };
+
+    if (grade) filter.grade = grade; // chỉ thêm nếu có
+
+    const records = await Attendance.find(filter).sort({
+      date: 1,
+      session: 1,
+      studentName: 1,
+    });
 
     res.status(200).json(records);
   } catch (error) {
     console.error("❌ Lỗi khi lấy danh sách theo tuần:", error);
-    res.status(500).json({ message: "Lỗi server khi lấy danh sách nghỉ học theo tuần", error });
+    res.status(500).json({
+      message: "Lỗi server khi lấy danh sách nghỉ học theo tuần",
+      error,
+    });
   }
 };
+
 
 // ✅ (Tùy chọn sau này) Cập nhật duyệt có phép
 exports.approvePermission = async (req, res) => {
