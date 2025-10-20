@@ -14,7 +14,9 @@ exports.getSettings = async (req, res) => {
     if (settingsData.maxClassAcademicScoresByGrade instanceof Map) {
       settingsData.maxClassAcademicScoresByGrade = Object.fromEntries(settingsData.maxClassAcademicScoresByGrade);
     }
-
+      if (settingsData.limitGVCNHandling === undefined) {
+      settingsData.limitGVCNHandling = false;
+    }
     res.json(settingsData);
   } catch (err) {
     console.error('Lỗi khi lấy settings:', err);
