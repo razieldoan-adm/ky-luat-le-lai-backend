@@ -38,7 +38,7 @@ exports.recordAbsence = async (req, res) => {
     }
 
     // ✅ Ghi nhận hoặc cập nhật bản ghi nghỉ học
-    const record = await ClassAttendanceSummary.findOneAndUpdate(
+    const record = await Attendance.findOneAndUpdate(
       { studentId, date, session },
       {
         studentId,
