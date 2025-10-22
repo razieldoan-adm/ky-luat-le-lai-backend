@@ -7,6 +7,8 @@ const ClassAttendanceSummarySchema = new mongoose.Schema({
   className: { type: String, required: true },
   grade: { type: String, required: true },
   date: { type: String, required: true }, // YYYY-MM-DD
+    // 🆕 Thêm trường này để lưu tuần được xác định tự động
+  weekNumber: { type: Number, required: true },
   session: { type: String, enum: ["sáng", "chiều"], required: true },
   permission: { type: Boolean, default: false }, // false = không phép
 });
