@@ -216,3 +216,16 @@ exports.confirmPermission = async (req, res) => {
     });
   }
 };
+
+exports.deleteAttendanceRecord = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const record = await ClassAttendanceSummary.findByIdAndDelete(id);
+    if (!record)
+      return res.status(404).json({ message: "Không tìm thấy bản ghi để xoá." });
+    res.status(200).json({ message: "Đã xoá bản ghi nghỉ học." });
+  } catch (error) {
+    console.error("❌ Lỗi khi xoá bản ghi:", error);
+    res.status(500).json({ message: "Lỗi server khi xoá bản ghi." });
+  }
+};
