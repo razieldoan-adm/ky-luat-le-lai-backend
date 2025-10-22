@@ -1,11 +1,11 @@
 const Attendance = require("../models/ClassAttendanceSummary");
 const dayjs = require("dayjs");
 
-// 🧩 Hàm bỏ dấu tiếng Việt (chuẩn hóa tìm kiếm không phân biệt hoa thường / dấu)
+// 🧩 Hàm bỏ dấu tiếng Việt (chuẩn hóa tìm kiếm)
 function normalizeVietnamese(str = "") {
   return str
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // bỏ dấu
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D")
     .toLowerCase()
@@ -47,6 +47,7 @@ exports.recordAbsence = async (req, res) => {
       date: formattedDate,
       session,
       permission: false,
+      confirmed: false, // 🔹 thêm cờ xác nhận
     });
 
     await attendance.save();
@@ -71,14 +72,9 @@ exports.getByDate = async (req, res) => {
     }
 
     const formattedDate = dayjs(date).format("YYYY-MM-DD");
-
-    const filter = {
-      className,
-      date: formattedDate,
-    };
+    const filter = { className, date: formattedDate };
     if (grade) filter.grade = grade;
 
-    // Nếu có tìm kiếm tên học sinh
     if (search && search.trim()) {
       const keyword = normalizeVietnamese(search);
       filter.studentNameNormalized = { $regex: keyword, $options: "i" };
@@ -111,14 +107,9 @@ exports.getByWeek = async (req, res) => {
 
     const start = dayjs(startDate).format("YYYY-MM-DD");
     const end = dayjs(endDate).format("YYYY-MM-DD");
-
-    const filter = {
-      className,
-      date: { $gte: start, $lte: end },
-    };
+    const filter = { className, date: { $gte: start, $lte: end } };
     if (grade) filter.grade = grade;
 
-    // Tìm kiếm không phân biệt hoa / dấu
     if (search && search.trim()) {
       const keyword = normalizeVietnamese(search);
       filter.studentNameNormalized = { $regex: keyword, $options: "i" };
@@ -156,6 +147,57 @@ exports.approvePermission = async (req, res) => {
     console.error("❌ Lỗi khi duyệt nghỉ có phép:", error);
     res.status(500).json({
       message: "Lỗi server khi duyệt nghỉ có phép",
+      error,
+    });
+  }
+};
+
+// ✅ Lấy danh sách nghỉ học không phép
+exports.getUnexcusedAbsences = async (req, res) => {
+  try {
+    const { className, weekNumber, search } = req.query;
+
+    const filter = { permission: false };
+    if (className) filter.className = className;
+    if (weekNumber) filter.weekNumber = Number(weekNumber);
+
+    if (search && search.trim()) {
+      const keyword = normalizeVietnamese(search);
+      filter.studentNameNormalized = { $regex: keyword, $options: "i" };
+    }
+
+    const records = await Attendance.find(filter).sort({
+      date: 1,
+      session: 1,
+      studentName: 1,
+    });
+
+    res.status(200).json(records);
+  } catch (error) {
+    console.error("❌ Lỗi khi lấy danh sách nghỉ không phép:", error);
+    res.status(500).json({
+      message: "Lỗi server khi lấy danh sách nghỉ không phép",
+      error,
+    });
+  }
+};
+
+// ✅ Xác nhận bản ghi nghỉ học (ví dụ GVCN xác nhận đã kiểm tra)
+exports.confirmAbsence = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const record = await Attendance.findById(id);
+    if (!record)
+      return res.status(404).json({ message: "Không tìm thấy bản ghi." });
+
+    record.confirmed = true;
+    await record.save();
+
+    res.status(200).json({ message: "Đã xác nhận bản ghi nghỉ học.", record });
+  } catch (error) {
+    console.error("❌ Lỗi khi xác nhận bản ghi:", error);
+    res.status(500).json({
+      message: "Lỗi server khi xác nhận bản ghi nghỉ học",
       error,
     });
   }
