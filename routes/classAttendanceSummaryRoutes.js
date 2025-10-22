@@ -16,4 +16,6 @@ router.get("/unexcused", attendanceController.getUnexcusedAbsences);
 router.put("/approve/:id", attendanceController.approvePermission);
 router.put("/confirm/:id", attendanceController.confirmPermission);
 
+router.delete("/:id", attendanceController.deleteAttendanceRecord);
+
 module.exports = router;
