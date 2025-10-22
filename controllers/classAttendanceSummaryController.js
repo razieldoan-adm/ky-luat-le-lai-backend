@@ -220,7 +220,7 @@ exports.confirmPermission = async (req, res) => {
 exports.deleteAttendanceRecord = async (req, res) => {
   try {
     const { id } = req.params;
-    const record = await ClassAttendanceSummary.findByIdAndDelete(id);
+    const record = await Attendance.findByIdAndDelete(id);
     if (!record)
       return res.status(404).json({ message: "Không tìm thấy bản ghi để xoá." });
     res.status(200).json({ message: "Đã xoá bản ghi nghỉ học." });
