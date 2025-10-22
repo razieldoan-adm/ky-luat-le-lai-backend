@@ -1,5 +1,6 @@
 // controllers/attendanceController.js
 const Attendance = require("../models/ClassAttendanceSummary");
+const AcademicWeek = require("../models/AcademicWeek");
 const dayjs = require("dayjs");
 
 // 🧩 Hàm bỏ dấu tiếng Việt (chuẩn hóa tìm kiếm không phân biệt hoa thường / dấu)
@@ -14,50 +15,51 @@ function normalizeVietnamese(str = "") {
 }
 
 // ✅ Ghi nhận học sinh nghỉ học
+// ✅ Ghi nhận học sinh nghỉ học
 exports.recordAbsence = async (req, res) => {
   try {
     const { studentId, studentName, className, grade, date, session } = req.body;
 
-    if (!studentId || !studentName || !className || !grade || !session) {
+    // 🔍 Kiểm tra dữ liệu đầu vào
+    if (!studentId || !studentName || !className || !grade || !date || !session) {
       return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
     }
 
-    const formattedDate = date
-      ? dayjs(date).format("YYYY-MM-DD")
-      : dayjs().format("YYYY-MM-DD");
+    // ✅ Xác định tuần học tương ứng với ngày nghỉ
+    const formattedDate = dayjs(date).startOf("day").toDate();
 
-    const existing = await Attendance.findOne({
-      studentId,
-      date: formattedDate,
-      session,
+    const week = await AcademicWeek.findOne({
+      startDate: { $lte: formattedDate },
+      endDate: { $gte: formattedDate },
     });
 
-    if (existing) {
-      return res.status(400).json({
-        message: "Đã ghi nhận học sinh này trong buổi này.",
-      });
+    if (!week) {
+      console.warn("⚠️ Không tìm thấy tuần tương ứng cho ngày:", date);
     }
 
-    const attendance = new Attendance({
-      studentId,
-      studentName,
-      studentNameNormalized: normalizeVietnamese(studentName),
-      className,
-      classNameNormalized: normalizeVietnamese(className),
-      grade,
-      date: formattedDate,
-      session,
-      permission: false,
-    });
+    // ✅ Ghi nhận hoặc cập nhật bản ghi nghỉ học
+    const record = await ClassAttendanceSummary.findOneAndUpdate(
+      { studentId, date, session },
+      {
+        studentId,
+        studentName,
+        className,
+        grade,
+        date,
+        session,
+        permission: false, // mặc định là không phép
+        weekNumber: week ? week.weekNumber : 0, // nếu không tìm thấy tuần thì gán 0
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
-    await attendance.save();
-    res.status(201).json({ message: "Đã ghi nhận nghỉ học.", attendance });
-  } catch (error) {
-    console.error("❌ Lỗi khi ghi nhận nghỉ học:", error);
-    res.status(500).json({
-      message: "Lỗi server khi ghi nhận nghỉ học",
-      error,
+    return res.status(200).json({
+      message: "Ghi nhận nghỉ học thành công.",
+      record,
     });
+  } catch (error) {
+    console.error("❌ Lỗi ghi nhận nghỉ học:", error);
+    return res.status(500).json({ message: "Lỗi server khi ghi nhận nghỉ học." });
   }
 };
 
