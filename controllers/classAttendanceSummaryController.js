@@ -238,3 +238,55 @@ exports.deleteAttendanceRecord = async (req, res) => {
     res.status(500).json({ message: "Lỗi server khi xoá bản ghi." });
   }
 };
+// controllers/classAttendanceSummaryController.js
+const ClassAttendanceSummary = require("../models/ClassAttendanceSummary");
+const AcademicWeek = require("../models/AcademicWeek");
+const Class = require("../models/Class"); // nếu có bảng danh sách lớp
+
+exports.getWeeklyUnexcusedSummary = async (req, res) => {
+  try {
+    const { weekNumber } = req.query;
+    const MULTIPLIER = 5; // hệ số mặc định (có thể lấy từ settings sau này)
+
+    if (!weekNumber) {
+      return res.status(400).json({ message: "Thiếu tham số weekNumber" });
+    }
+
+    const week = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
+    if (!week) {
+      return res.status(404).json({ message: "Không tìm thấy tuần học" });
+    }
+
+    // Lấy tất cả bản ghi nghỉ không phép trong tuần
+    const absences = await ClassAttendanceSummary.find({
+      permission: false,
+      date: { $gte: week.startDate, $lte: week.endDate },
+    });
+
+    // Nhóm theo lớp
+    const classAbsences = {};
+    absences.forEach((a) => {
+      classAbsences[a.className] = (classAbsences[a.className] || 0) + 1;
+    });
+
+    // Lấy danh sách lớp (để lớp không có nghỉ vẫn hiện)
+    const classes = await Class.find({}, "className").lean();
+
+    const results = classes.map((cls) => {
+      const count = classAbsences[cls.className] || 0;
+      return {
+        className: cls.className,
+        absences: count,
+        score: -count * MULTIPLIER,
+      };
+    });
+
+    return res.status(200).json({
+      message: "Tổng hợp nghỉ học không phép theo tuần thành công",
+      results,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi tổng hợp nghỉ học:", error);
+    res.status(500).json({ message: "Lỗi server khi tổng hợp nghỉ học" });
+  }
+};
