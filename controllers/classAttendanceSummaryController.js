@@ -105,23 +105,29 @@ exports.getByDate = async (req, res) => {
 // ✅ Lấy danh sách nghỉ học theo tuần
 exports.getByWeek = async (req, res) => {
   try {
-    const { className, grade, startDate, endDate, search } = req.query;
-    if (!className || !startDate || !endDate) {
-      return res.status(400).json({
-        message: "Thiếu className, startDate hoặc endDate.",
-      });
+    const { className, grade, weekNumber, search } = req.query;
+
+    if (!weekNumber) {
+      return res.status(400).json({ message: "Thiếu tham số weekNumber." });
     }
 
-    const start = dayjs(startDate).format("YYYY-MM-DD");
-    const end = dayjs(endDate).format("YYYY-MM-DD");
+    // 🔹 Lấy thông tin tuần
+    const week = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
+    if (!week) {
+      return res.status(404).json({ message: "Không tìm thấy tuần tương ứng." });
+    }
 
+    const start = dayjs(week.startDate).format("YYYY-MM-DD");
+    const end = dayjs(week.endDate).format("YYYY-MM-DD");
+
+    // 🔹 Tạo bộ lọc
     const filter = {
-      className,
       date: { $gte: start, $lte: end },
     };
+    if (className) filter.className = className;
     if (grade) filter.grade = grade;
 
-    // Tìm kiếm không phân biệt hoa / dấu
+    // 🔍 Tìm kiếm theo tên (bỏ dấu, không phân biệt hoa thường)
     if (search && search.trim()) {
       const keyword = normalizeVietnamese(search);
       filter.studentNameNormalized = { $regex: keyword, $options: "i" };
@@ -133,11 +139,14 @@ exports.getByWeek = async (req, res) => {
       studentName: 1,
     });
 
-    res.status(200).json(records);
+    return res.status(200).json({
+      message: "Lấy danh sách nghỉ học trong tuần thành công.",
+      records,
+    });
   } catch (error) {
-    console.error("❌ Lỗi khi lấy danh sách theo tuần:", error);
+    console.error("❌ Lỗi khi lấy danh sách nghỉ học theo tuần:", error);
     res.status(500).json({
-      message: "Lỗi server khi lấy danh sách nghỉ học theo tuần",
+      message: "Lỗi server khi lấy danh sách nghỉ học theo tuần.",
       error,
     });
   }
