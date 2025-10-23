@@ -238,10 +238,6 @@ exports.deleteAttendanceRecord = async (req, res) => {
     res.status(500).json({ message: "Lỗi server khi xoá bản ghi." });
   }
 };
-// controllers/classAttendanceSummaryController.js
-const ClassAttendanceSummary = require("../models/ClassAttendanceSummary");
-const AcademicWeek = require("../models/AcademicWeek");
-const Class = require("../models/Class"); // nếu có bảng danh sách lớp
 
 exports.getWeeklyUnexcusedSummary = async (req, res) => {
   try {
