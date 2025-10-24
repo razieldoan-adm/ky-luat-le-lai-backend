@@ -286,3 +286,49 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
     res.status(500).json({ message: "Lỗi server khi tổng hợp nghỉ học" });
   }
 };
+
+// ✅ Lấy tất cả bản ghi nghỉ học của 1 học sinh
+exports.getAttendanceByStudent = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    if (!studentId) {
+      return res.status(400).json({ message: "Thiếu studentId" });
+    }
+
+    const records = await ClassAttendanceSummary.find({ studentId })
+      .sort({ date: -1 })
+      .lean();
+
+    res.json(records);
+  } catch (err) {
+    console.error("❌ Lỗi lấy dữ liệu chuyên cần học sinh:", err);
+    res.status(500).json({ message: "Lỗi server khi lấy danh sách chuyên cần học sinh" });
+  }
+};
+
+// ✅ (Tuỳ chọn) Thống kê nhanh tình hình chuyên cần
+exports.getStudentAttendanceSummary = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    if (!studentId) {
+      return res.status(400).json({ message: "Thiếu studentId" });
+    }
+
+    const totalAbsences = await ClassAttendanceSummary.countDocuments({ studentId });
+    const totalWithPermission = await ClassAttendanceSummary.countDocuments({
+      studentId,
+      permission: true,
+    });
+    const totalWithoutPermission = totalAbsences - totalWithPermission;
+
+    res.json({
+      totalAbsences,
+      totalWithPermission,
+      totalWithoutPermission,
+    });
+  } catch (err) {
+    console.error("❌ Lỗi thống kê chuyên cần:", err);
+    res.status(500).json({ message: "Lỗi server khi thống kê chuyên cần" });
+  }
+};
+
