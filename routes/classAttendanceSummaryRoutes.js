@@ -19,4 +19,10 @@ router.put("/confirm/:id", attendanceController.confirmPermission);
 router.delete("/:id", attendanceController.deleteAttendanceRecord);
 router.get("/weekly-summary", attendanceController.getWeeklyUnexcusedSummary);
 
+// ✅ Lấy toàn bộ bản ghi nghỉ học của 1 học sinh
+router.get("/by-student/:studentId", attendanceControlle.getAttendanceByStudent);
+
+// ✅ (Tuỳ chọn) Lấy thống kê tổng quan chuyên cần học sinh
+router.get("/by-student/:studentId/summary", attendanceControlle.getStudentAttendanceSummary);
+
 module.exports = router;
