@@ -49,15 +49,33 @@ exports.updateSettings = async (req, res) => {
 
 exports.updateSetting = async (req, res) => {
   try {
-    const { limitGVCNHandling } = req.body;
+    const { limitGVCNHandling, classViolationLimit } = req.body;
+
     let setting = await Setting.findOne();
     if (!setting) setting = new Setting({});
-    setting.limitGVCNHandling = limitGVCNHandling;
+
+    // ✅ Cập nhật từng trường nếu có gửi lên
+    if (limitGVCNHandling !== undefined) {
+      setting.limitGVCNHandling = limitGVCNHandling;
+    }
+
+    if (classViolationLimit !== undefined) {
+      setting.classViolationLimit = classViolationLimit;
+    }
+
     await setting.save();
-    res.json({ message: "Cập nhật thành công", setting });
+
+    res.json({
+      message: "Cập nhật giới hạn xử lý kỷ luật thành công",
+      setting,
+    });
   } catch (err) {
     console.error("Lỗi khi cập nhật setting:", err);
     res.status(500).json({ message: "Lỗi server" });
   }
 };
+
+
+
+
 
