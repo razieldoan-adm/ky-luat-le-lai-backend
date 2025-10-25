@@ -20,6 +20,7 @@ const settingSchema = new mongoose.Schema({
     type: Number,
     default: 100, // ví dụ mặc định
   },
+  classViolationLimit: { type: Number, default: 5 },
   maxWeeklyAttendanceScore: {
     type: Number,
     default: 100,
