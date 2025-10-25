@@ -105,16 +105,21 @@ exports.getByDate = async (req, res) => {
 // ✅ Lấy danh sách nghỉ học theo tuần
 exports.getByWeek = async (req, res) => {
   try {
-    const { className, grade, weekNumber, search } = req.query;
+    const { className, grade, date, search } = req.query;
 
-    if (!weekNumber) {
-      return res.status(400).json({ message: "Thiếu tham số weekNumber." });
+    if (!date) {
+      return res.status(400).json({ message: "Thiếu tham số date." });
     }
 
-    // 🔹 Lấy thông tin tuần
-    const week = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
+    // 🔹 Xác định tuần chứa ngày được chọn
+    const targetDate = dayjs(date).startOf("day");
+    const week = await AcademicWeek.findOne({
+      startDate: { $lte: targetDate },
+      endDate: { $gte: targetDate },
+    });
+
     if (!week) {
-      return res.status(404).json({ message: "Không tìm thấy tuần tương ứng." });
+      return res.status(404).json({ message: "Không tìm thấy tuần chứa ngày này." });
     }
 
     const start = dayjs(week.startDate).format("YYYY-MM-DD");
@@ -142,6 +147,7 @@ exports.getByWeek = async (req, res) => {
     return res.status(200).json({
       message: "Lấy danh sách nghỉ học trong tuần thành công.",
       records,
+      weekInfo: week, // thêm nếu muốn hiển thị thông tin tuần
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy danh sách nghỉ học theo tuần:", error);
@@ -151,6 +157,7 @@ exports.getByWeek = async (req, res) => {
     });
   }
 };
+
 
 // ✅ Duyệt nghỉ có phép (route: /api/attendance/approve/:id)
 exports.approvePermission = async (req, res) => {
