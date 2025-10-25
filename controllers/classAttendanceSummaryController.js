@@ -15,7 +15,6 @@ function normalizeVietnamese(str = "") {
 }
 
 // ✅ Ghi nhận học sinh nghỉ học
-// ✅ Ghi nhận học sinh nghỉ học
 exports.recordAbsence = async (req, res) => {
   try {
     const { studentId, studentName, className, grade, date, session } = req.body;
@@ -147,7 +146,7 @@ exports.getByWeek = async (req, res) => {
     return res.status(200).json({
       message: "Lấy danh sách nghỉ học trong tuần thành công.",
       records,
-      weekInfo: week, // thêm nếu muốn hiển thị thông tin tuần
+      weekInfo: week,
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy danh sách nghỉ học theo tuần:", error);
@@ -157,6 +156,7 @@ exports.getByWeek = async (req, res) => {
     });
   }
 };
+
 
 
 // ✅ Duyệt nghỉ có phép (route: /api/attendance/approve/:id)
