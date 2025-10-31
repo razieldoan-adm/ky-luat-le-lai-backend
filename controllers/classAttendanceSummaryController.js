@@ -248,8 +248,8 @@ exports.deleteAttendanceRecord = async (req, res) => {
 
 exports.getWeeklyUnexcusedSummary = async (req, res) => {
   try {
-    const { weekNumber } = req.query;
-    const MULTIPLIER = 5; // hệ số mặc định (có thể lấy từ settings sau này)
+    const { weekNumber, multiplier } = req.query;
+    const MULTIPLIER = Number(multiplier) || 5; // hệ số linh động, mặc định = 5
 
     if (!weekNumber) {
       return res.status(400).json({ message: "Thiếu tham số weekNumber" });
@@ -260,27 +260,31 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tuần học" });
     }
 
-    // Lấy tất cả bản ghi nghỉ không phép trong tuần
+    // Lấy tất cả bản ghi nghỉ học KHÔNG PHÉP trong tuần
     const absences = await ClassAttendanceSummary.find({
       permission: false,
       date: { $gte: week.startDate, $lte: week.endDate },
     });
 
-    // Nhóm theo lớp
+    // Nhóm theo lớp (đếm số lượt nghỉ không phép)
     const classAbsences = {};
     absences.forEach((a) => {
-      classAbsences[a.className] = (classAbsences[a.className] || 0) + 1;
+      if (a.className) {
+        classAbsences[a.className] = (classAbsences[a.className] || 0) + 1;
+      }
     });
 
-    // Lấy danh sách lớp (để lớp không có nghỉ vẫn hiện)
+    // Lấy danh sách lớp để hiển thị cả lớp không có nghỉ
     const classes = await Class.find({}, "className").lean();
 
+    // Tính điểm cho từng lớp
     const results = classes.map((cls) => {
       const count = classAbsences[cls.className] || 0;
       return {
         className: cls.className,
-        absences: count,
-        score: -count * MULTIPLIER,
+        unexcusedAbsences: count,
+        score: -count * MULTIPLIER, // điểm trừ = số nghỉ * hệ số
+        multiplier: MULTIPLIER, // trả về để frontend biết đang dùng hệ số bao nhiêu
       };
     });
 
@@ -293,6 +297,7 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
     res.status(500).json({ message: "Lỗi server khi tổng hợp nghỉ học" });
   }
 };
+
 
 // ✅ Lấy tất cả bản ghi nghỉ học của 1 học sinh
 exports.getAttendanceByStudent = async (req, res) => {
