@@ -265,7 +265,7 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
     }
 
     // lấy các bản ghi nghỉ không phép
-    const absences = await ClassAttendanceSummary.find({
+    const absences = await Attendance.find({
       permission: false,
       date: { $gte: week.startDate, $lte: week.endDate },
     });
