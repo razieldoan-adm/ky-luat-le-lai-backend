@@ -283,7 +283,7 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
       return {
         className: cls.className,
         unexcusedAbsences: count,
-        score: -count * MULTIPLIER, // điểm trừ = số nghỉ * hệ số
+        score: count * MULTIPLIER, // điểm trừ = số nghỉ * hệ số
         multiplier: MULTIPLIER, // trả về để frontend biết đang dùng hệ số bao nhiêu
       };
     });
