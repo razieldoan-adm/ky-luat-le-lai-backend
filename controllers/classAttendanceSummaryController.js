@@ -264,10 +264,10 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
     console.log("📅 Lọc dữ liệu từ:", start, "→", end);
 
     // Truy vấn bản ghi nghỉ không phép
-    const absences = await Attendance.find({
-      $or: [{ permission: false }, { permission: "false" }],
-      date: { $gte: start, $lte: end },
-    }).lean();
+const absences = await Attendance.find({
+  permission: false,
+  weekNumber: Number(weekNumber),
+});
 
     console.log("🔍 Số bản ghi:", absences.length);
 
