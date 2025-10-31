@@ -1,4 +1,5 @@
 // controllers/attendanceController.js
+const Class = require("../models/Class");
 const Attendance = require("../models/ClassAttendanceSummary");
 const AcademicWeek = require("../models/AcademicWeek");
 const dayjs = require("dayjs");
@@ -249,47 +250,39 @@ exports.deleteAttendanceRecord = async (req, res) => {
 exports.getWeeklyUnexcusedSummary = async (req, res) => {
   try {
     const { weekNumber } = req.query;
-    const MULTIPLIER = 5; // hệ số mặc định
 
     if (!weekNumber) {
       return res.status(400).json({ message: "Thiếu tham số weekNumber" });
     }
 
-    // 🔹 kiểm tra tuần
     const week = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
     if (!week) {
       return res.status(404).json({ message: "Không tìm thấy tuần học" });
     }
 
-    // 🔹 kiểm tra ngày hợp lệ
     if (!week.startDate || !week.endDate) {
-      return res.status(400).json({ message: "Tuần học chưa có ngày bắt đầu hoặc kết thúc" });
+      return res.status(400).json({ message: "Tuần học chưa có ngày bắt đầu/kết thúc" });
     }
 
-    // 🔹 tìm bản ghi nghỉ không phép
+    // lấy các bản ghi nghỉ không phép
     const absences = await ClassAttendanceSummary.find({
       permission: false,
       date: { $gte: week.startDate, $lte: week.endDate },
     });
 
-    // 🔹 nhóm theo lớp
+    // nhóm theo lớp
     const classAbsences = {};
     absences.forEach((a) => {
       classAbsences[a.className] = (classAbsences[a.className] || 0) + 1;
     });
 
-    // 🔹 lấy danh sách lớp
+    // lấy danh sách lớp (để lớp không có nghỉ vẫn hiện)
     const classes = await Class.find({}, "className").lean();
 
-    // 🔹 tạo kết quả (điểm dương)
-    const results = classes.map((cls) => {
-      const count = classAbsences[cls.className] || 0;
-      return {
-        className: cls.className,
-        absences: count,
-        score: count * MULTIPLIER, // ✅ điểm dương để frontend tùy ý trừ
-      };
-    });
+    const results = classes.map((cls) => ({
+      className: cls.className,
+      absences: classAbsences[cls.className] || 0, // ✅ chỉ trả số nghỉ
+    }));
 
     return res.status(200).json({
       message: "Tổng hợp nghỉ học không phép theo tuần thành công",
@@ -301,7 +294,6 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
     res.status(500).json({ message: "Lỗi server khi tổng hợp nghỉ học", error: error.message });
   }
 };
-
 
 
 // ✅ Lấy tất cả bản ghi nghỉ học của 1 học sinh
