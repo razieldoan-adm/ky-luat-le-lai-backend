@@ -247,51 +247,57 @@ exports.deleteAttendanceRecord = async (req, res) => {
   }
 };
 
+// controllers/attendanceController.js
 exports.getWeeklyUnexcusedSummary = async (req, res) => {
   try {
     const { weekNumber } = req.query;
-    if (!weekNumber) {
+    if (!weekNumber)
       return res.status(400).json({ message: "Thiếu tham số weekNumber" });
-    }
 
     const week = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
-    if (!week) return res.status(404).json({ message: "Không tìm thấy tuần học" });
+    if (!week)
+      return res.status(404).json({ message: "Không tìm thấy tuần học" });
 
     const start = new Date(week.startDate);
     const end = new Date(week.endDate);
 
-    console.log("📅 Tìm nghỉ không phép từ", start, "đến", end);
+    console.log("📅 Lọc dữ liệu từ:", start, "→", end);
 
+    // Truy vấn bản ghi nghỉ không phép
     const absences = await ClassAttendanceSummary.find({
       $or: [{ permission: false }, { permission: "false" }],
       date: { $gte: start, $lte: end },
-    });
+    }).lean();
 
-    console.log("🔍 Tìm thấy", absences.length, "bản ghi nghỉ không phép");
+    console.log("🔍 Số bản ghi:", absences.length);
 
+    // Gom nhóm theo lớp
     const classAbsences = {};
     absences.forEach(a => {
-      classAbsences[a.className] = (classAbsences[a.className] || 0) + 1;
+      const name = a.className || "Chưa có tên lớp";
+      classAbsences[name] = (classAbsences[name] || 0) + 1;
     });
 
     const classes = await Class.find({}, "className").lean();
 
-    const results = classes.map(cls => ({
+    const results = classes.map((cls, index) => ({
+      id: index + 1,
       className: cls.className,
       absences: classAbsences[cls.className] || 0,
     }));
 
     return res.status(200).json({
-      message: "Tổng hợp nghỉ học không phép theo tuần thành công",
+      message: "✅ Tổng hợp nghỉ học không phép theo tuần thành công",
       results,
     });
   } catch (error) {
     console.error("❌ Lỗi tổng hợp nghỉ học:", error);
-    res.status(500).json({ message: "Lỗi server khi tổng hợp nghỉ học", error: error.message });
+    res.status(500).json({
+      message: "Lỗi server khi tổng hợp nghỉ học",
+      error: error.message,
+    });
   }
 };
-
-
 
 // ✅ Lấy tất cả bản ghi nghỉ học của 1 học sinh
 exports.getAttendanceByStudent = async (req, res) => {
