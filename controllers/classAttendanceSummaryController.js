@@ -248,43 +248,46 @@ exports.deleteAttendanceRecord = async (req, res) => {
 
 exports.getWeeklyUnexcusedSummary = async (req, res) => {
   try {
-    const { weekNumber, multiplier } = req.query;
-    const MULTIPLIER = Number(multiplier) || 5; // hệ số linh động, mặc định = 5
+    const { weekNumber } = req.query;
+    const MULTIPLIER = 5; // hệ số mặc định
 
     if (!weekNumber) {
       return res.status(400).json({ message: "Thiếu tham số weekNumber" });
     }
 
+    // 🔹 kiểm tra tuần
     const week = await AcademicWeek.findOne({ weekNumber: Number(weekNumber) });
     if (!week) {
       return res.status(404).json({ message: "Không tìm thấy tuần học" });
     }
 
-    // Lấy tất cả bản ghi nghỉ học KHÔNG PHÉP trong tuần
+    // 🔹 kiểm tra ngày hợp lệ
+    if (!week.startDate || !week.endDate) {
+      return res.status(400).json({ message: "Tuần học chưa có ngày bắt đầu hoặc kết thúc" });
+    }
+
+    // 🔹 tìm bản ghi nghỉ không phép
     const absences = await ClassAttendanceSummary.find({
       permission: false,
       date: { $gte: week.startDate, $lte: week.endDate },
     });
 
-    // Nhóm theo lớp (đếm số lượt nghỉ không phép)
+    // 🔹 nhóm theo lớp
     const classAbsences = {};
     absences.forEach((a) => {
-      if (a.className) {
-        classAbsences[a.className] = (classAbsences[a.className] || 0) + 1;
-      }
+      classAbsences[a.className] = (classAbsences[a.className] || 0) + 1;
     });
 
-    // Lấy danh sách lớp để hiển thị cả lớp không có nghỉ
+    // 🔹 lấy danh sách lớp
     const classes = await Class.find({}, "className").lean();
 
-    // Tính điểm cho từng lớp
+    // 🔹 tạo kết quả (điểm dương)
     const results = classes.map((cls) => {
       const count = classAbsences[cls.className] || 0;
       return {
         className: cls.className,
-        unexcusedAbsences: count,
-        score: count * MULTIPLIER, // điểm trừ = số nghỉ * hệ số
-        multiplier: MULTIPLIER, // trả về để frontend biết đang dùng hệ số bao nhiêu
+        absences: count,
+        score: count * MULTIPLIER, // ✅ điểm dương để frontend tùy ý trừ
       };
     });
 
@@ -292,11 +295,13 @@ exports.getWeeklyUnexcusedSummary = async (req, res) => {
       message: "Tổng hợp nghỉ học không phép theo tuần thành công",
       results,
     });
+
   } catch (error) {
     console.error("❌ Lỗi tổng hợp nghỉ học:", error);
-    res.status(500).json({ message: "Lỗi server khi tổng hợp nghỉ học" });
+    res.status(500).json({ message: "Lỗi server khi tổng hợp nghỉ học", error: error.message });
   }
 };
+
 
 
 // ✅ Lấy tất cả bản ghi nghỉ học của 1 học sinh
