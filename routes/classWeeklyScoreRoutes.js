@@ -21,5 +21,5 @@ router.delete("/:weekNumber", controller.deleteWeeklyScores);
 // 🔹 Xuất Excel dữ liệu điểm của tuần
 // GET /api/weekly-scores/export/:weekNumber
 router.get("/export/:weekNumber", controller.exportWeeklyScores);
-router.get("/full/:weekNumber", weeklyScoresController.getFullWeeklyScores);
+router.get("/full/:weekNumber", controller.getFullWeeklyScores);
 module.exports = router;
