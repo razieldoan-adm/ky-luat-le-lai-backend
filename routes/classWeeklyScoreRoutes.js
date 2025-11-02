@@ -9,7 +9,7 @@ router.get("/weekly", controller.getWeeklyScores);
 // 🔹 Cập nhật hoặc tạo mới điểm cho lớp trong tuần (dùng chung cho lineup, hygiene, violation,...)
 // POST /api/weekly-scores/update
 router.post("/update", controller.updateWeeklyScores);
-
+router.post("/save-manual", controller.saveManualWeeklyScores);
 // 🔹 Lấy danh sách các tuần đã có dữ liệu
 // GET /api/weekly-scores/weeks
 router.get("/weeks", controller.getWeeksWithScores);
