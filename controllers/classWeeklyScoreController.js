@@ -186,3 +186,36 @@ exports.saveManualWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+/**
+ * GET /weekly-scores/full/:weekNumber
+ * → Lấy toàn bộ dữ liệu tổng hợp của 1 tuần (cho trang Tổng kết tuần)
+ */
+exports.getFullWeeklyScores = async (req, res) => {
+  try {
+    const { weekNumber } = req.params;
+
+    if (!weekNumber) {
+      return res.status(400).json({ message: "Thiếu tham số weekNumber" });
+    }
+
+    const scores = await ClassWeeklyScore.find({ weekNumber })
+      .sort({ grade: 1, ranking: 1 })
+      .lean();
+
+    if (!scores.length) {
+      return res.status(404).json({
+        message: `Không tìm thấy dữ liệu cho tuần ${weekNumber}`,
+      });
+    }
+
+    res.json({
+      message: `✅ Dữ liệu tổng hợp của tuần ${weekNumber}`,
+      weekNumber: Number(weekNumber),
+      totalClasses: scores.length,
+      data: scores,
+    });
+  } catch (err) {
+    console.error("❌ Lỗi trong getFullWeeklyScores:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
