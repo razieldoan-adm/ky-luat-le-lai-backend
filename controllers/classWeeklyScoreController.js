@@ -113,3 +113,76 @@ exports.exportWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+// ✅ Lưu toàn bộ điểm nhập thủ công trong trang Tổng kết tuần
+exports.saveManualWeeklyScores = async (req, res) => {
+  try {
+    const { records } = req.body;
+
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ message: "Không có dữ liệu để lưu." });
+    }
+
+    let updatedList = [];
+
+    for (const rec of records) {
+      const {
+        className,
+        grade,
+        weekNumber,
+        academicScore = 0,
+        rewardScore = 0,
+        hygieneScore = 0,
+        lineupScore = 0,
+        attendanceScore = 0,
+        violationScore = 0,
+      } = rec;
+
+      if (!className || !grade || !weekNumber) continue;
+
+      // ✅ Tính lại disciplineScore và totalScore
+      const disciplineScore =
+        hygieneScore + lineupScore + attendanceScore + violationScore;
+
+      const totalScore = academicScore + rewardScore + disciplineScore;
+
+      const updated = await ClassWeeklyScore.findOneAndUpdate(
+        { className, grade, weekNumber },
+        {
+          $set: {
+            academicScore,
+            rewardScore,
+            hygieneScore,
+            lineupScore,
+            attendanceScore,
+            violationScore,
+            disciplineScore,
+            totalScore,
+          },
+        },
+        { new: true, upsert: true }
+      );
+
+      updatedList.push(updated);
+    }
+
+    // ✅ Sau khi lưu xong, tính lại thứ hạng trong cùng khối
+    const grade = records[0].grade;
+    const weekNumber = records[0].weekNumber;
+    const allInGrade = await ClassWeeklyScore.find({ grade, weekNumber })
+      .sort({ totalScore: -1 });
+
+    for (let i = 0; i < allInGrade.length; i++) {
+      allInGrade[i].ranking = i + 1;
+      await allInGrade[i].save();
+    }
+
+    res.json({
+      message: "✅ Đã lưu toàn bộ điểm tuần và cập nhật xếp hạng.",
+      data: updatedList,
+    });
+  } catch (err) {
+    console.error("❌ Lỗi trong saveManualWeeklyScores:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
