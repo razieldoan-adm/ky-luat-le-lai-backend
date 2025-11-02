@@ -105,25 +105,21 @@ exports.getByDate = async (req, res) => {
 // ✅ Lấy danh sách nghỉ học theo tuần
 exports.getByWeek = async (req, res) => {
   try {
-    const { className, grade, date, search } = req.query;
-
-    if (!date) {
-      return res.status(400).json({ message: "Thiếu tham số date." });
-    }
-
-    // 🔹 Xác định tuần chứa ngày được chọn
-    const targetDate = dayjs(date).startOf("day");
-    const week = await AcademicWeek.findOne({
-      startDate: { $lte: targetDate },
-      endDate: { $gte: targetDate },
-    });
+    const { className, grade, week, search } = req.query;
 
     if (!week) {
-      return res.status(404).json({ message: "Không tìm thấy tuần chứa ngày này." });
+      return res.status(400).json({ message: "Thiếu tham số week." });
     }
 
-    const start = dayjs(week.startDate).format("YYYY-MM-DD");
-    const end = dayjs(week.endDate).format("YYYY-MM-DD");
+    // 🔹 Tìm tuần trong bảng AcademicWeek theo số tuần
+    const weekData = await AcademicWeek.findOne({ weekNumber: Number(week) });
+
+    if (!weekData) {
+      return res.status(404).json({ message: "Không tìm thấy dữ liệu tuần này." });
+    }
+
+    const start = dayjs(weekData.startDate).format("YYYY-MM-DD");
+    const end = dayjs(weekData.endDate).format("YYYY-MM-DD");
 
     // 🔹 Tạo bộ lọc
     const filter = {
@@ -132,7 +128,7 @@ exports.getByWeek = async (req, res) => {
     if (className) filter.className = className;
     if (grade) filter.grade = grade;
 
-    // 🔍 Tìm kiếm theo tên (bỏ dấu, không phân biệt hoa thường)
+    // 🔍 Tìm kiếm theo tên (bỏ dấu)
     if (search && search.trim()) {
       const keyword = normalizeVietnamese(search);
       filter.studentNameNormalized = { $regex: keyword, $options: "i" };
@@ -147,7 +143,7 @@ exports.getByWeek = async (req, res) => {
     return res.status(200).json({
       message: "Lấy danh sách nghỉ học trong tuần thành công.",
       records,
-      weekInfo: week,
+      weekInfo: weekData,
     });
   } catch (error) {
     console.error("❌ Lỗi khi lấy danh sách nghỉ học theo tuần:", error);
@@ -157,8 +153,6 @@ exports.getByWeek = async (req, res) => {
     });
   }
 };
-
-
 
 // ✅ Duyệt nghỉ có phép (route: /api/attendance/approve/:id)
 exports.approvePermission = async (req, res) => {
