@@ -33,7 +33,7 @@ exports.updateWeeklyScores = async (req, res) => {
       attendanceScore,
       violationScore,
     } = req.body;
-
+    console.log("📩 BODY nhận được từ frontend:", req.body);
     if (!className || !weekNumber || !grade) {
       return res.status(400).json({ message: "Thiếu className, weekNumber hoặc grade" });
     }
