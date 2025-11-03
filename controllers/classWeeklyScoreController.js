@@ -123,7 +123,7 @@ exports.saveManualWeeklyScores = async (req, res) => {
       return res.status(400).json({ message: "Không có dữ liệu để lưu." });
     }
 
-    let updatedList = [];
+    const updatedList = [];
 
     for (const rec of records) {
       const {
@@ -136,28 +136,26 @@ exports.saveManualWeeklyScores = async (req, res) => {
         lineupScore = 0,
         attendanceScore = 0,
         violationScore = 0,
+        disciplineScore = 0,
+        totalScore = 0,
+        rank = 0,
       } = rec;
 
       if (!className || !grade || !weekNumber) continue;
-
-      // ✅ Tính lại disciplineScore và totalScore
-      const disciplineScore =
-        hygieneScore + lineupScore + attendanceScore + violationScore;
-
-      const totalScore = academicScore + rewardScore + disciplineScore;
 
       const updated = await ClassWeeklyScore.findOneAndUpdate(
         { className, grade, weekNumber },
         {
           $set: {
-            academicScore,
-            rewardScore,
-            hygieneScore,
-            lineupScore,
-            attendanceScore,
-            violationScore,
-            disciplineScore,
-            totalScore,
+            academicScore: Number(academicScore) || 0,
+            rewardScore: Number(rewardScore) || 0,
+            hygieneScore: Number(hygieneScore) || 0,
+            lineUpScore: Number(lineupScore) || 0,
+            attendanceScore: Number(attendanceScore) || 0,
+            violationScore: Number(violationScore) || 0,
+            disciplineScore: Number(disciplineScore) || 0,
+            totalScore: Number(totalScore) || 0,
+            rank: Number(rank) || 0,
           },
         },
         { new: true, upsert: true }
@@ -166,26 +164,16 @@ exports.saveManualWeeklyScores = async (req, res) => {
       updatedList.push(updated);
     }
 
-    // ✅ Sau khi lưu xong, tính lại thứ hạng trong cùng khối
-    const grade = records[0].grade;
-    const weekNumber = records[0].weekNumber;
-    const allInGrade = await ClassWeeklyScore.find({ grade, weekNumber })
-      .sort({ totalScore: -1 });
-
-    for (let i = 0; i < allInGrade.length; i++) {
-      allInGrade[i].ranking = i + 1;
-      await allInGrade[i].save();
-    }
-
     res.json({
-      message: "✅ Đã lưu toàn bộ điểm tuần và cập nhật xếp hạng.",
+      message: "✅ Đã lưu dữ liệu tuần (theo tính toán frontend).",
       data: updatedList,
     });
   } catch (err) {
-    console.error("❌ Lỗi trong saveManualWeeklyScores:", err);
+    console.error("❌ Lỗi khi lưu điểm:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
 /**
  * GET /weekly-scores/full/:weekNumber
  * → Lấy toàn bộ dữ liệu tổng hợp của 1 tuần (cho trang Tổng kết tuần)
