@@ -134,7 +134,7 @@ exports.saveManualWeeklyScores = async (req, res) => {
         bonusScore = 0,        // ✅ đúng với schema
         hygieneScore = 0,
         attendanceScore = 0,
-        lineUpScore = 0,       // ✅ đúng với schema
+        lineupScore = 0,       // ✅ đúng với schema
         violationScore = 0,
         totalViolation = 0,    // ✅ đúng với schema
         totalScore = 0,
@@ -152,7 +152,7 @@ exports.saveManualWeeklyScores = async (req, res) => {
             bonusScore: Number(bonusScore) || 0,
             hygieneScore: Number(hygieneScore) || 0,
             attendanceScore: Number(attendanceScore) || 0,
-            lineUpScore: Number(lineUpScore) || 0,
+            lineUpScore: Number(lineupScore) || 0,
             violationScore: Number(violationScore) || 0,
             totalViolation: Number(totalViolation) || 0,
             totalScore: Number(totalScore) || 0,
