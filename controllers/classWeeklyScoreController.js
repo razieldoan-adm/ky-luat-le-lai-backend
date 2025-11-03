@@ -148,6 +148,9 @@ exports.saveManualWeeklyScores = async (req, res) => {
         { className, grade, weekNumber },
         {
           $set: {
+            className,
+            grade,
+            weekNumber,
             academicScore: Number(academicScore) || 0,
             bonusScore: Number(bonusScore) || 0,
             hygieneScore: Number(hygieneScore) || 0,
