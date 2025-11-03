@@ -131,31 +131,33 @@ exports.saveManualWeeklyScores = async (req, res) => {
         grade,
         weekNumber,
         academicScore = 0,
-        rewardScore = 0,
+        bonusScore = 0,        // ✅ đúng với schema
         hygieneScore = 0,
-        lineupScore = 0,
         attendanceScore = 0,
+        lineUpScore = 0,       // ✅ đúng với schema
         violationScore = 0,
-        disciplineScore = 0,
+        totalViolation = 0,    // ✅ đúng với schema
         totalScore = 0,
-        rank = 0,
+        rank = 0,              // ✅ đúng với schema
       } = rec;
 
       if (!className || !grade || !weekNumber) continue;
 
+      // ✅ Ghi đúng field name trong schema
       const updated = await ClassWeeklyScore.findOneAndUpdate(
         { className, grade, weekNumber },
         {
           $set: {
             academicScore: Number(academicScore) || 0,
-            rewardScore: Number(rewardScore) || 0,
+            bonusScore: Number(bonusScore) || 0,
             hygieneScore: Number(hygieneScore) || 0,
-            lineUpScore: Number(lineupScore) || 0,
             attendanceScore: Number(attendanceScore) || 0,
+            lineUpScore: Number(lineUpScore) || 0,
             violationScore: Number(violationScore) || 0,
-            disciplineScore: Number(disciplineScore) || 0,
+            totalViolation: Number(totalViolation) || 0,
             totalScore: Number(totalScore) || 0,
             rank: Number(rank) || 0,
+            lastUpdated: new Date(),
           },
         },
         { new: true, upsert: true }
@@ -165,7 +167,7 @@ exports.saveManualWeeklyScores = async (req, res) => {
     }
 
     res.json({
-      message: "✅ Đã lưu dữ liệu tuần (theo tính toán frontend).",
+      message: "✅ Đã lưu toàn bộ điểm tuần (theo tính toán frontend).",
       data: updatedList,
     });
   } catch (err) {
@@ -173,6 +175,7 @@ exports.saveManualWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
 
 /**
  * GET /weekly-scores/full/:weekNumber
