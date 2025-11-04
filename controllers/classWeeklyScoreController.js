@@ -22,9 +22,10 @@ exports.getWeeklyScores = async (req, res) => {
  * POST /weekly-scores/update
  * Cập nhật điểm (gọi chung cho lineup, hygiene, violation,...)
  */
+// controllers/classWeeklyScoreController.js
 exports.updateWeeklyScores = async (req, res) => {
   try {
-    let {
+    const {
       className,
       grade,
       weekNumber,
@@ -36,36 +37,46 @@ exports.updateWeeklyScores = async (req, res) => {
 
     console.log("📩 BODY nhận được từ frontend:", req.body);
 
-    // ✅ Nếu frontend không gửi grade, tự bóc từ tên lớp (VD: "7A1" -> "7")
-    if (!grade && className) {
-      const match = className.match(/^(\d+)/);
-      grade = match ? match[1] : "Khác";
+    // ✅ Kiểm tra className và weekNumber
+    if (!className || !weekNumber) {
+      return res.status(400).json({ message: "Thiếu className hoặc weekNumber" });
     }
 
-    if (!className || !weekNumber || !grade) {
-      return res.status(400).json({ message: "Thiếu className, weekNumber hoặc grade" });
+    // ✅ Nếu frontend quên gửi grade → tự suy ra từ tên lớp
+    let finalGrade = grade;
+    if (!finalGrade && className) {
+      const match = className.match(/^(\d+)/); // ví dụ "9A3" → "9"
+      finalGrade = match ? match[1] : "Khác";
     }
 
-    // ✅ Tìm hoặc tạo mới
+    // ✅ Nếu vẫn không có grade → báo lỗi rõ ràng
+    if (!finalGrade) {
+      return res.status(400).json({ message: "Thiếu grade và không thể suy ra từ className" });
+    }
+
+    // ✅ Tìm hoặc tạo mới bản ghi theo className + weekNumber
     let weekly = await ClassWeeklyScore.findOne({ className, weekNumber });
     if (!weekly) {
-      weekly = new ClassWeeklyScore({ className, grade, weekNumber });
+      weekly = new ClassWeeklyScore({ className, grade: finalGrade, weekNumber });
+    } else {
+      weekly.grade = finalGrade; // cập nhật luôn cho chắc
     }
 
-    // ✅ Gán điểm từng loại
-    weekly.hygieneScore = hygieneScore ?? weekly.hygieneScore ?? 0;
-    weekly.lineupScore = lineupScore ?? weekly.lineupScore ?? 0;
-    weekly.attendanceScore = attendanceScore ?? weekly.attendanceScore ?? 0;
-    weekly.violationScore = violationScore ?? weekly.violationScore ?? 0;
+    // ✅ Gán điểm (chỉ cập nhật những gì gửi lên)
+    if (hygieneScore !== undefined) weekly.hygieneScore = hygieneScore;
+    if (lineupScore !== undefined) weekly.lineupScore = lineupScore;
+    if (attendanceScore !== undefined) weekly.attendanceScore = attendanceScore;
+    if (violationScore !== undefined) weekly.violationScore = violationScore;
 
     await weekly.save();
 
-    res.json({ message: "✅ Đã lưu điểm tuần", data: weekly });
+    res.json({ message: "✅ Đã lưu điểm tuần thành công", data: weekly });
   } catch (err) {
     console.error("❌ Lỗi trong updateWeeklyScores:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
 
 /**
  * GET /weekly-scores/weeks
