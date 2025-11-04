@@ -24,7 +24,7 @@ exports.getWeeklyScores = async (req, res) => {
  */
 exports.updateWeeklyScores = async (req, res) => {
   try {
-    const {
+    let {
       className,
       grade,
       weekNumber,
@@ -33,7 +33,15 @@ exports.updateWeeklyScores = async (req, res) => {
       attendanceScore,
       violationScore,
     } = req.body;
+
     console.log("📩 BODY nhận được từ frontend:", req.body);
+
+    // ✅ Nếu frontend không gửi grade, tự bóc từ tên lớp (VD: "7A1" -> "7")
+    if (!grade && className) {
+      const match = className.match(/^(\d+)/);
+      grade = match ? match[1] : "Khác";
+    }
+
     if (!className || !weekNumber || !grade) {
       return res.status(400).json({ message: "Thiếu className, weekNumber hoặc grade" });
     }
@@ -44,7 +52,7 @@ exports.updateWeeklyScores = async (req, res) => {
       weekly = new ClassWeeklyScore({ className, grade, weekNumber });
     }
 
-    // ✅ Gán 4 loại điểm
+    // ✅ Gán điểm từng loại
     weekly.hygieneScore = hygieneScore ?? weekly.hygieneScore ?? 0;
     weekly.lineupScore = lineupScore ?? weekly.lineupScore ?? 0;
     weekly.attendanceScore = attendanceScore ?? weekly.attendanceScore ?? 0;
