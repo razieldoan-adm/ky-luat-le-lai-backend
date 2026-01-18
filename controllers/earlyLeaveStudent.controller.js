@@ -54,20 +54,20 @@ exports.createEarlyLeaveStudent = async (req, res) => {
 // 📋 Lấy danh sách theo lớp
 exports.getEarlyLeaveStudentsByClass = async (req, res) => {
   try {
-    const { className, schoolYear } = req.query;
+    const { className} = req.query;
 
-    if (!className || !schoolYear) {
+    if (!className ) {
       return res.status(400).json({
-        message: "Thiếu className hoặc schoolYear",
+        message: "Thiếu className ",
       });
     }
 
     const list = await EarlyLeaveStudent.find({
-      className,
-      schoolYear,
+      className
+      
     }).sort({ name: 1 });
 
-    res.json(list);
+    res.json(students);
   } catch (err) {
     res.status(500).json({
       message: err.message,
