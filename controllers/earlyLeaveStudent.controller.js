@@ -1,9 +1,21 @@
 const EarlyLeaveStudent = require("../models/EarlyLeaveStudent");
 
 // ➕ Nhập HS (1 lần / năm)
+const EarlyLeaveStudent = require("../models/earlyLeaveStudent.model");
+
+// hàm chuẩn hóa tiếng Việt
+const normalizeText = (text) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+
 exports.createEarlyLeaveStudent = async (req, res) => {
   try {
-    const { name, normalizedName, className } = req.body;
+    const { name, className } = req.body;
 
     if (!name || !className) {
       return res.status(400).json({
@@ -11,9 +23,11 @@ exports.createEarlyLeaveStudent = async (req, res) => {
       });
     }
 
-    // 👉 tự xác định năm học hiện tại
-    const currentYear = new Date().getFullYear();
-    const schoolYear = `${currentYear}-${currentYear + 1}`;
+    const normalizedName = normalizeText(name);
+
+    // 👉 nếu FE không gửi năm học thì backend tự sinh
+    const year = new Date().getFullYear();
+    const schoolYear = `${year}-${year + 1}`;
 
     const student = await EarlyLeaveStudent.create({
       name,
@@ -22,11 +36,13 @@ exports.createEarlyLeaveStudent = async (req, res) => {
       schoolYear,
     });
 
-    res.json(student);
+    res.status(201).json(student);
   } catch (err) {
+    console.error("❌ CREATE EARLY LEAVE ERROR:", err);
+
     if (err.code === 11000) {
       return res.status(409).json({
-        message: "Học sinh đã tồn tại trong năm học",
+        message: "Học sinh đã tồn tại trong lớp năm học này",
       });
     }
 
@@ -35,7 +51,6 @@ exports.createEarlyLeaveStudent = async (req, res) => {
     });
   }
 };
-
 
 // 📋 Lấy danh sách theo lớp
 exports.getEarlyLeaveStudentsByClass = async (req, res) => {
