@@ -63,7 +63,7 @@ exports.getEarlyLeaveStudentsByClass = async (req, res) => {
     }
 
     const list = await EarlyLeaveStudent.find({
-      className
+      className: className.trim(),
       
     }).sort({ name: 1 });
 
