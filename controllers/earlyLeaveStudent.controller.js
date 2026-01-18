@@ -1,7 +1,6 @@
 const EarlyLeaveStudent = require("../models/EarlyLeaveStudent");
 
 // ➕ Nhập HS (1 lần / năm)
-const EarlyLeaveStudent = require("../models/earlyLeaveStudent.model");
 
 // hàm chuẩn hóa tiếng Việt
 const normalizeText = (text) =>
