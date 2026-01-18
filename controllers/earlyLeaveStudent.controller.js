@@ -67,7 +67,7 @@ exports.getEarlyLeaveStudentsByClass = async (req, res) => {
       
     }).sort({ name: 1 });
 
-    res.json(students);
+    res.json(list);
   } catch (err) {
     res.status(500).json({
       message: err.message,
