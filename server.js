@@ -18,6 +18,8 @@ const classAttendanceSummaryRoutes = require('./routes/classAttendanceSummaryRou
 const classLineUpSummaryRoutes = require('./routes/classLineUpSummaryRoutes');
 const classWeeklyScoreRoutes = require('./routes/classWeeklyScoreRoutes');
 
+const earlyLeaveStudentRoutes = require("./routes/earlyLeaveStudent.routes");
+
 const studentRoutes = require('./routes/studentRoutes');
 
 const authRoutes = require('./routes/authRoutes');
@@ -58,7 +60,7 @@ app.use('/api/class-lineup-summaries', classLineUpSummaryRoutes);
 app.use('/api/class-weekly-scores', classWeeklyScoreRoutes);
 app.use('/api/class-rank', emulationRoutes);
 app.use('/api/students',studentRoutes);
-
+app.use("/api/early-leave/students", earlyLeaveStudentRoutes);
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
