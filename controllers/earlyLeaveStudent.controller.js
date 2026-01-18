@@ -55,3 +55,18 @@ exports.getEarlyLeaveStudentsByClass = async (req, res) => {
     });
   }
 };
+
+// 📋 lấy tất cả
+exports.getAllEarlyLeaveStudents = async (req, res) => {
+  const list = await EarlyLeaveStudent.find().sort({
+    className: 1,
+    name: 1,
+  });
+  res.json(list);
+};
+
+// ❌ xoá
+exports.deleteEarlyLeaveStudent = async (req, res) => {
+  await EarlyLeaveStudent.findByIdAndDelete(req.params.id);
+  res.json({ success: true });
+};
