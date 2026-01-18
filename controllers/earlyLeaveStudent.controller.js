@@ -3,13 +3,17 @@ const EarlyLeaveStudent = require("../models/EarlyLeaveStudent");
 // ➕ Nhập HS (1 lần / năm)
 exports.createEarlyLeaveStudent = async (req, res) => {
   try {
-    const { name, normalizedName, className, schoolYear } = req.body;
+    const { name, normalizedName, className } = req.body;
 
-    if (!name || !className || !schoolYear) {
+    if (!name || !className) {
       return res.status(400).json({
-        message: "Thiếu dữ liệu",
+        message: "Thiếu tên hoặc lớp",
       });
     }
+
+    // 👉 tự xác định năm học hiện tại
+    const currentYear = new Date().getFullYear();
+    const schoolYear = `${currentYear}-${currentYear + 1}`;
 
     const student = await EarlyLeaveStudent.create({
       name,
@@ -31,6 +35,7 @@ exports.createEarlyLeaveStudent = async (req, res) => {
     });
   }
 };
+
 
 // 📋 Lấy danh sách theo lớp
 exports.getEarlyLeaveStudentsByClass = async (req, res) => {
