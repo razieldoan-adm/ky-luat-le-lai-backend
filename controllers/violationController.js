@@ -234,8 +234,18 @@ exports.getUnhandledViolationStudents = async (req, res) => {
 // 📊 Lấy toàn bộ vi phạm
 exports.getAllViolationStudents = async (req, res) => {
   try {
-    const violations = await Violation.find().sort({ time: -1 });
-    res.json(violations); // ✅ dữ liệu trả về đã có handledBy và handlingNote
+    const { weekNumber } = req.query;
+
+    const filter = {};
+    if (weekNumber) {
+      filter.weekNumber = Number(weekNumber);
+    }
+
+    const violations = await Violation.find(filter)
+      .sort({ time: -1 })
+      .limit(500);   // tránh load toàn bộ DB
+
+    res.json(violations);
   } catch (error) {
     res.status(500).json({ error: 'Lỗi server khi lấy danh sách vi phạm' });
   }
