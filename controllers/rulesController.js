@@ -2,116 +2,441 @@ const Rule = require('../models/Rule');
 const xlsx = require('xlsx');
 
 /**
- * Lấy toàn bộ rules
+ * ==========================================
+ * LẤY TOÀN BỘ RULE
+ * ==========================================
  */
 exports.getAllRules = async (req, res) => {
   try {
-    const rules = await Rule.find();
+    const rules = await Rule.find()
+      .sort({
+        groupCode: 1,
+        ruleCode: 1,
+      });
+
     res.json(rules);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('getAllRules error:', err);
+
+    res.status(500).json({
+      message: 'Server error',
+    });
   }
 };
 
+
 /**
- * Tạo rule mới
+ * ==========================================
+ * TẠO RULE MỚI
+ * ==========================================
  */
 exports.createRule = async (req, res) => {
   try {
-    const { title, point, content } = req.body;
-    if (!title) {
-      return res.status(400).json({ message: 'Missing title' });
+    const {
+      groupCode,
+      groupName,
+      ruleCode,
+      title,
+      point,
+      content,
+      active,
+    } = req.body;
+
+    // Kiểm tra dữ liệu bắt buộc
+    if (!groupCode || !groupName || !ruleCode || !title) {
+      return res.status(400).json({
+        message:
+          'Vui lòng nhập đầy đủ groupCode, groupName, ruleCode và title',
+      });
     }
 
-    const newRule = new Rule({ title, point, content });
+    const normalizedGroupCode = String(groupCode)
+      .trim()
+      .toUpperCase();
+
+    const normalizedRuleCode = String(ruleCode)
+      .trim()
+      .toUpperCase();
+
+    // Kiểm tra mã lỗi trùng
+    const existed = await Rule.findOne({
+      ruleCode: normalizedRuleCode,
+    });
+
+    if (existed) {
+      return res.status(400).json({
+        message: `Mã lỗi ${normalizedRuleCode} đã tồn tại`,
+      });
+    }
+
+    const newRule = new Rule({
+      groupCode: normalizedGroupCode,
+      groupName: String(groupName).trim(),
+      ruleCode: normalizedRuleCode,
+      title: String(title).trim(),
+      point: Number(point) || 0,
+      content: content ? String(content).trim() : '',
+      active: active !== false,
+    });
+
     await newRule.save();
-    res.json(newRule);
+
+    res.status(201).json(newRule);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('createRule error:', err);
+
+    res.status(500).json({
+      message: 'Server error',
+    });
   }
 };
 
+
 /**
- * Cập nhật rule theo ID
+ * ==========================================
+ * CẬP NHẬT RULE
+ * ==========================================
  */
 exports.updateRule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, point, content } = req.body;
+
+    const {
+      groupCode,
+      groupName,
+      ruleCode,
+      title,
+      point,
+      content,
+      active,
+    } = req.body;
+
+    // Kiểm tra dữ liệu bắt buộc
+    if (!groupCode || !groupName || !ruleCode || !title) {
+      return res.status(400).json({
+        message:
+          'Vui lòng nhập đầy đủ groupCode, groupName, ruleCode và title',
+      });
+    }
+
+    const normalizedGroupCode = String(groupCode)
+      .trim()
+      .toUpperCase();
+
+    const normalizedRuleCode = String(ruleCode)
+      .trim()
+      .toUpperCase();
+
+    // Kiểm tra mã lỗi có bị trùng với Rule khác không
+    const existed = await Rule.findOne({
+      ruleCode: normalizedRuleCode,
+      _id: { $ne: id },
+    });
+
+    if (existed) {
+      return res.status(400).json({
+        message: `Mã lỗi ${normalizedRuleCode} đã tồn tại`,
+      });
+    }
 
     const updated = await Rule.findByIdAndUpdate(
       id,
-      { title, point, content },
-      { new: true }
+      {
+        groupCode: normalizedGroupCode,
+        groupName: String(groupName).trim(),
+        ruleCode: normalizedRuleCode,
+        title: String(title).trim(),
+        point: Number(point) || 0,
+        content: content ? String(content).trim() : '',
+        active: active !== false,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
     );
 
     if (!updated) {
-      return res.status(404).json({ message: 'Rule not found' });
+      return res.status(404).json({
+        message: 'Không tìm thấy Rule',
+      });
     }
 
     res.json(updated);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('updateRule error:', err);
+
+    res.status(500).json({
+      message: 'Server error',
+    });
   }
 };
 
+
 /**
- * Xóa rule theo ID
+ * ==========================================
+ * XÓA RULE
+ * ==========================================
  */
 exports.deleteRule = async (req, res) => {
   try {
     const { id } = req.params;
-    await Rule.findByIdAndDelete(id);
-    res.json({ message: 'Deleted' });
+
+    const deleted = await Rule.findByIdAndDelete(id);
+
+    if (!deleted) {
+      return res.status(404).json({
+        message: 'Không tìm thấy Rule',
+      });
+    }
+
+    res.json({
+      message: 'Deleted',
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('deleteRule error:', err);
+
+    res.status(500).json({
+      message: 'Server error',
+    });
   }
 };
 
+
 /**
- * Import rules từ file Excel
+ * ==========================================
+ * IMPORT RULE TỪ EXCEL
+ *
+ * Excel gồm:
+ *
+ * groupCode
+ * groupName
+ * ruleCode
+ * title
+ * point
+ * content
+ * active
+ *
+ * ==========================================
  */
 exports.importRules = async (req, res) => {
   try {
+    // ----------------------------------------
+    // Kiểm tra file
+    // ----------------------------------------
     if (!req.file) {
-      return res.status(400).json({ message: 'No file uploaded' });
+      return res.status(400).json({
+        message: 'Chưa chọn file Excel',
+      });
     }
 
+    // ----------------------------------------
+    // Đọc Excel
+    // ----------------------------------------
     const workbook = xlsx.readFile(req.file.path);
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const data = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+
+    const sheetName = workbook.SheetNames[0];
+
+    const sheet = workbook.Sheets[sheetName];
+
+    const data = xlsx.utils.sheet_to_json(sheet, {
+      defval: '',
+    });
 
     console.log('DATA IMPORT:', data);
 
-    const rules = data.reduce((acc, r, index) => {
-      const title = r['NỘI DUNG'] || r['NOI DUNG'] || '';
-      if (!title) {
-        console.warn(`⚠️ Dòng ${index + 2} không có NỘI DUNG, bỏ qua`);
-        return acc;
-      }
-      acc.push({
-        title,
-        point: parseInt(r['ĐIỂM TRỪ'] || r['DIEM TRU']) || 0,
-        content: r['GHI CHÚ'] || r['GHI CHU'] || '',
+    if (!data.length) {
+      return res.status(400).json({
+        message: 'File Excel không có dữ liệu',
       });
-      return acc;
-    }, []);
-
-    if (!rules.length) {
-      return res.status(400).json({ message: 'Không có dữ liệu hợp lệ để import' });
     }
 
-    // 👉 Xóa dữ liệu cũ (nếu muốn reset toàn bộ trước khi import)
-    await Rule.deleteMany({});
-    await Rule.insertMany(rules);
+    // ----------------------------------------
+    // Chuẩn bị dữ liệu
+    // ----------------------------------------
+    const rules = [];
 
-    res.json({ message: 'Imported successfully', count: rules.length });
+    const errors = [];
+
+    // Kiểm tra trùng mã lỗi trong Excel
+    const ruleCodes = new Set();
+
+    data.forEach((rowData, index) => {
+      const rowNumber = index + 2;
+
+      const groupCode = String(
+        rowData.groupCode || ''
+      )
+        .trim()
+        .toUpperCase();
+
+      const groupName = String(
+        rowData.groupName || ''
+      ).trim();
+
+      const ruleCode = String(
+        rowData.ruleCode || ''
+      )
+        .trim()
+        .toUpperCase();
+
+      const title = String(
+        rowData.title || ''
+      ).trim();
+
+      const content = String(
+        rowData.content || ''
+      ).trim();
+
+      const pointRaw = rowData.point;
+
+      // --------------------------------------
+      // Kiểm tra bắt buộc
+      // --------------------------------------
+
+      if (!groupCode) {
+        errors.push(
+          `Dòng ${rowNumber}: thiếu groupCode`
+        );
+        return;
+      }
+
+      if (!groupName) {
+        errors.push(
+          `Dòng ${rowNumber}: thiếu groupName`
+        );
+        return;
+      }
+
+      if (!ruleCode) {
+        errors.push(
+          `Dòng ${rowNumber}: thiếu ruleCode`
+        );
+        return;
+      }
+
+      if (!title) {
+        errors.push(
+          `Dòng ${rowNumber}: thiếu title`
+        );
+        return;
+      }
+
+      // --------------------------------------
+      // Kiểm tra point
+      // --------------------------------------
+
+      const point = Number(pointRaw);
+
+      if (
+        pointRaw === '' ||
+        pointRaw === null ||
+        pointRaw === undefined ||
+        Number.isNaN(point)
+      ) {
+        errors.push(
+          `Dòng ${rowNumber}: point không hợp lệ`
+        );
+        return;
+      }
+
+      // --------------------------------------
+      // Kiểm tra mã lỗi trùng trong Excel
+      // --------------------------------------
+
+      if (ruleCodes.has(ruleCode)) {
+        errors.push(
+          `Dòng ${rowNumber}: mã lỗi ${ruleCode} bị trùng trong Excel`
+        );
+        return;
+      }
+
+      ruleCodes.add(ruleCode);
+
+      // --------------------------------------
+      // Xử lý active
+      // --------------------------------------
+
+      let active = rowData.active;
+
+      if (
+        active === '' ||
+        active === undefined ||
+        active === null
+      ) {
+        active = true;
+      } else {
+        const activeText = String(active)
+          .trim()
+          .toLowerCase();
+
+        active =
+          active === true ||
+          active === 1 ||
+          activeText === 'true' ||
+          activeText === 'yes' ||
+          activeText === '1';
+      }
+
+      // --------------------------------------
+      // Thêm Rule
+      // --------------------------------------
+
+      rules.push({
+        groupCode,
+        groupName,
+        ruleCode,
+        title,
+        point,
+        content,
+        active,
+      });
+    });
+
+    // ----------------------------------------
+    // Nếu Excel có lỗi
+    // KHÔNG xóa database
+    // ----------------------------------------
+    if (errors.length > 0) {
+      return res.status(400).json({
+        message:
+          'File Excel có dữ liệu không hợp lệ',
+        errors,
+      });
+    }
+
+    if (!rules.length) {
+      return res.status(400).json({
+        message:
+          'Không có dữ liệu hợp lệ để import',
+      });
+    }
+
+    // ----------------------------------------
+    // XÓA RULE CŨ
+    //
+    // Vì bạn xác định xây dựng lại
+    // toàn bộ nội quy mới
+    // ----------------------------------------
+    await Rule.deleteMany({});
+
+    // ----------------------------------------
+    // IMPORT RULE MỚI
+    // ----------------------------------------
+    const insertedRules =
+      await Rule.insertMany(rules);
+
+    res.json({
+      message:
+        'Import nội quy thành công',
+      count: insertedRules.length,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Import failed' });
+    console.error('importRules error:', err);
+
+    res.status(500).json({
+      message: 'Import failed',
+      error: err.message,
+    });
   }
 };
