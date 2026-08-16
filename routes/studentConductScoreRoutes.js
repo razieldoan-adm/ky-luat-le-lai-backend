@@ -8,6 +8,7 @@ const {
   createOrUpdateScore,
   finalizeScore,
   deleteScore,
+  finalizeClassWeek,
 } = require('../controllers/studentConductScoreController');
 
 const {
