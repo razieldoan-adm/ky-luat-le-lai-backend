@@ -333,82 +333,152 @@ exports.deleteScore = async (req, res) => {
  * =====================================================
  */
 
-exports.finalizeClassWeek =
-  async (req, res) => {
-    try {
-      const {
-        className,
-        academicYear,
-        weekNumber,
-      } = req.body;
+/**
+ * =====================================================
+ * CHỐT TOÀN BỘ HỌC SINH TRONG LỚP / TUẦN
+ * =====================================================
+ *
+ * - Chỉ BGH/Admin được gọi từ route
+ * - Lưu toàn bộ học sinh của lớp
+ * - HS có vi phạm: lưu điểm đã tính
+ * - HS không vi phạm: lưu 100 điểm
+ * - Tất cả chuyển sang FINAL
+ */
+exports.finalizeClassWeek = async (req, res) => {
+  try {
+    const {
+      className,
+      academicYear,
+      weekNumber,
+    } = req.body;
 
-      if (
-        !className ||
-        !academicYear ||
-        !weekNumber
-      ) {
-        return res.status(400).json({
-          message:
-            "Thiếu className, academicYear hoặc weekNumber",
-        });
-      }
+    if (
+      !className ||
+      !academicYear ||
+      !weekNumber
+    ) {
+      return res.status(400).json({
+        message:
+          "Thiếu className, academicYear hoặc weekNumber",
+      });
+    }
 
-      const week =
-        Number(weekNumber);
+    const week = Number(weekNumber);
 
-      // =================================================
-      // LẤY CÁC BẢN GHI TUẦN CỦA LỚP
-      // =================================================
+    if (!Number.isInteger(week) || week < 1) {
+      return res.status(400).json({
+        message: "weekNumber không hợp lệ",
+      });
+    }
 
-      const scores =
-        await StudentConductScore.find({
-          className,
-          academicYear,
-          weekNumber: week,
-        });
+    // =================================================
+    // Ở bước này cần lấy TOÀN BỘ HỌC SINH CỦA LỚP
+    // =================================================
 
-      // =================================================
-      // CHỐT TOÀN BỘ
-      // =================================================
+    // TODO:
+    // import Student model ở đầu controller
+    // const Student = require('../models/Student');
 
-      const result =
-        await StudentConductScore.updateMany(
-          {
+    const students = await Student.find({
+      className,
+    }).sort({
+      name: 1,
+    });
+
+    if (!students.length) {
+      return res.status(404).json({
+        message:
+          `Không tìm thấy học sinh lớp ${className}`,
+      });
+    }
+
+    // =================================================
+    // CHỐT TỪNG HỌC SINH
+    // =================================================
+
+    const operations = students.map(
+      async (student) => {
+        // Tìm bản ghi tuần hiện tại nếu đã tồn tại
+        const existing =
+          await StudentConductScore.findOne({
+            name: student.name,
             className,
             academicYear,
             weekNumber: week,
+          });
+
+        // ---------------------------------------------
+        // Nếu đã có dữ liệu vi phạm
+        // ---------------------------------------------
+
+        if (existing) {
+          existing.status = "FINAL";
+
+          await existing.save();
+
+          return existing;
+        }
+
+        // ---------------------------------------------
+        // Nếu chưa có bản ghi
+        // → HS không có vi phạm
+        // → tạo điểm 100
+        // ---------------------------------------------
+
+        return StudentConductScore.create({
+          name: student.name,
+          className,
+          academicYear,
+          weekNumber: week,
+
+          maxScore: 100,
+
+          groupViolations: {
+            N1: 0,
+            N2: 0,
+            N3: 0,
+            N4: 0,
+            N5: 0,
+            S1: 0,
           },
-          {
-            $set: {
-              status: "FINAL",
-            },
-          }
-        );
 
-      res.json({
-        message:
-          `Đã chốt hạnh kiểm tuần ${week} lớp ${className}`,
+          totalConductViolations: 0,
 
-        matched:
-          result.matchedCount ??
-          result.n,
+          totalDeduction: 0,
 
-        modified:
-          result.modifiedCount ??
-          result.nModified,
+          finalScore: 100,
 
-        existing:
-          scores.length,
-      });
-    } catch (err) {
-      console.error(
-        "finalizeClassWeek error:",
-        err
-      );
+          hasSeriousViolation: false,
 
-      res.status(500).json({
-        message:
-          "Server error",
-      });
-    }
-  };
+          status: "FINAL",
+        });
+      }
+    );
+
+    const results = await Promise.all(
+      operations
+    );
+
+    res.json({
+      message:
+        `Đã chốt hạnh kiểm tuần ${week} lớp ${className}`,
+
+      className,
+
+      academicYear,
+
+      weekNumber: week,
+
+      totalStudents: results.length,
+    });
+  } catch (err) {
+    console.error(
+      "finalizeClassWeek error:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
