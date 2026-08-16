@@ -19,7 +19,12 @@ const classLineUpSummaryRoutes = require('./routes/classLineUpSummaryRoutes');
 const classWeeklyScoreRoutes = require('./routes/classWeeklyScoreRoutes');
 
 const earlyLeaveStudentRoutes = require("./routes/earlyLeaveStudent.routes");
+
 const studentConductScoreRoutes = require('./routes/studentConductScoreRoutes');
+const studentMonthlyConductRoutes = require("./routes/studentMonthlyConductRoutes");
+
+const studentAnnualConductRoutes =
+  require("./routes/studentAnnualConductRoutes");
 
 const studentRoutes = require('./routes/studentRoutes');
 
@@ -62,7 +67,9 @@ app.use('/api/class-weekly-scores', classWeeklyScoreRoutes);
 app.use('/api/class-rank', emulationRoutes);
 app.use('/api/students',studentRoutes);
 app.use("/api/early-leave/students", earlyLeaveStudentRoutes);
-app.use('/api/student-conduct-scores',studentConductScoreRoutes);
+app.use('/api/student-conduct-scores', studentConductScoreRoutes);
+app.use("/api/student-monthly-conduct", studentMonthlyConductRoutes);
+app.use("/api/student-annual-conduct", studentAnnualConductRoutes);
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
