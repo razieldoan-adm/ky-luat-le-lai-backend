@@ -263,7 +263,7 @@ exports.finalizeScore = async (req, res) => {
       await StudentConductScore.findByIdAndUpdate(
         id,
         {
-          status: 'FINAL',
+          status: "FINAL",
         },
         {
           new: true,
@@ -274,23 +274,22 @@ exports.finalizeScore = async (req, res) => {
     if (!score) {
       return res.status(404).json({
         message:
-          'Không tìm thấy điểm hạnh kiểm',
+          "Không tìm thấy điểm hạnh kiểm",
       });
     }
 
     res.json(score);
   } catch (err) {
     console.error(
-      'finalizeScore error:',
+      "finalizeScore error:",
       err
     );
 
     res.status(500).json({
-      message: 'Server error',
+      message: "Server error",
     });
   }
 };
-
 
 /**
  * =====================================================
