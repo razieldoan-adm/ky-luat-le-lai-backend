@@ -327,3 +327,88 @@ exports.deleteScore = async (req, res) => {
     });
   }
 };
+/**
+ * =====================================================
+ * CHỐT TOÀN BỘ
+ * =====================================================
+ */
+
+exports.finalizeClassWeek =
+  async (req, res) => {
+    try {
+      const {
+        className,
+        academicYear,
+        weekNumber,
+      } = req.body;
+
+      if (
+        !className ||
+        !academicYear ||
+        !weekNumber
+      ) {
+        return res.status(400).json({
+          message:
+            "Thiếu className, academicYear hoặc weekNumber",
+        });
+      }
+
+      const week =
+        Number(weekNumber);
+
+      // =================================================
+      // LẤY CÁC BẢN GHI TUẦN CỦA LỚP
+      // =================================================
+
+      const scores =
+        await StudentConductScore.find({
+          className,
+          academicYear,
+          weekNumber: week,
+        });
+
+      // =================================================
+      // CHỐT TOÀN BỘ
+      // =================================================
+
+      const result =
+        await StudentConductScore.updateMany(
+          {
+            className,
+            academicYear,
+            weekNumber: week,
+          },
+          {
+            $set: {
+              status: "FINAL",
+            },
+          }
+        );
+
+      res.json({
+        message:
+          `Đã chốt hạnh kiểm tuần ${week} lớp ${className}`,
+
+        matched:
+          result.matchedCount ??
+          result.n,
+
+        modified:
+          result.modifiedCount ??
+          result.nModified,
+
+        existing:
+          scores.length,
+      });
+    } catch (err) {
+      console.error(
+        "finalizeClassWeek error:",
+        err
+      );
+
+      res.status(500).json({
+        message:
+          "Server error",
+      });
+    }
+  };
