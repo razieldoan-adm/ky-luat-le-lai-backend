@@ -72,6 +72,15 @@ router.delete(
   isAdmin,
   deleteScore
 );
+// ==========================================
+// CHỐT TOÀN BỘ HỌC SINH CỦA LỚP / TUẦN
+// ==========================================
 
+router.post(
+  '/finalize-class-week',
+  verifyToken,
+  isAdmin,
+  finalizeClassWeek
+);
 
 module.exports = router;
