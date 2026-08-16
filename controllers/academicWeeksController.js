@@ -1,163 +1,474 @@
-const AcademicWeek = require('../models/AcademicWeek');
-const SettingTime = require('../models/SettingTime');
+const AcademicWeek = require("../models/AcademicWeek");
+const SettingTime = require("../models/SettingTime");
 
-const dayjs = require('dayjs');
-const isoWeek = require('dayjs/plugin/isoWeek');
-const weekday = require('dayjs/plugin/weekday');
-const utc = require('dayjs/plugin/utc');
-const timezone = require('dayjs/plugin/timezone');
+const dayjs = require("dayjs");
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
 
-// 👉 Kích hoạt plugin timezone toàn cục
-dayjs.extend(isoWeek);
-dayjs.extend(weekday);
 dayjs.extend(utc);
 dayjs.extend(timezone);
-dayjs.tz.setDefault('Asia/Ho_Chi_Minh');
+
+const VN_TIMEZONE = "Asia/Ho_Chi_Minh";
 
 /**
- * Generate weeks based on SettingTime start & end
+ * =========================================================
+ * TẠO DANH SÁCH TUẦN
+ *
+ * Quy tắc:
+ *
+ * Người dùng chọn ngày bất kỳ làm ngày đầu năm học.
+ *
+ * Ví dụ:
+ * Chọn Thứ Năm 21/08/2026
+ *
+ * Tuần đầu:
+ * 21/08/2026 -> 23/08/2026
+ *
+ * Tuần tiếp:
+ * 24/08/2026 -> 30/08/2026
+ *
+ * Sau đó:
+ * Thứ 2 -> Chủ nhật
+ *
+ * Lưu ý:
+ * - Chưa đánh số tuần tại bước này.
+ * - Tất cả tuần mới tạo đều isStudyWeek = false.
+ * - Người dùng sẽ chọn tuần học bằng checkbox.
+ * =========================================================
  */
+
 exports.generateWeeks = async (req, res) => {
   try {
     const setting = await SettingTime.findOne();
+
     if (!setting) {
-      return res.status(400).json({ message: '⚠️ Chưa cấu hình ngày bắt đầu / kết thúc năm học' });
+      return res.status(400).json({
+        message:
+          "⚠️ Chưa cấu hình ngày kết thúc năm học",
+      });
     }
 
-    // 🔹 Lấy thời gian bắt đầu / kết thúc theo múi giờ VN
-    const start = dayjs(setting.startSchoolYear).tz('Asia/Ho_Chi_Minh').startOf('day');
-    const end = dayjs(setting.endSchoolYear).tz('Asia/Ho_Chi_Minh').endOf('day');
+    /*
+     * Ngày bắt đầu có thể được gửi từ frontend.
+     *
+     * Nếu không gửi thì dùng startSchoolYear
+     * trong SettingTime.
+     */
+    const requestedStart =
+      req.body?.startSchoolYear ||
+      setting.startSchoolYear;
 
-    let weeks = [];
-    let current = start.startOf('week').add(1, 'day'); // ép về Thứ 2 tuần đầu tiên
+    if (!requestedStart) {
+      return res.status(400).json({
+        message:
+          "⚠️ Vui lòng chọn ngày bắt đầu năm học",
+      });
+    }
 
-    while (current.isBefore(end)) {
-      // Ngày bắt đầu tuần (Thứ 2)
-      const monday = current.startOf('day');
-      // Ngày kết thúc tuần (Chủ nhật)
-      let sunday = monday.add(6, 'day').endOf('day');
+    if (!setting.endSchoolYear) {
+      return res.status(400).json({
+        message:
+          "⚠️ Chưa cấu hình ngày kết thúc năm học",
+      });
+    }
 
-      if (sunday.isAfter(end)) sunday = end;
+    /*
+     * Parse ngày theo múi giờ Việt Nam.
+     *
+     * Dùng chuỗi YYYY-MM-DD để tránh trường hợp
+     * trình duyệt/server tự chuyển ngày sang UTC
+     * làm lệch ngày.
+     */
+    const start = dayjs
+      .tz(
+        String(requestedStart).slice(0, 10),
+        VN_TIMEZONE
+      )
+      .startOf("day");
+
+    const end = dayjs
+      .tz(
+        String(setting.endSchoolYear).slice(0, 10),
+        VN_TIMEZONE
+      )
+      .endOf("day");
+
+    if (!start.isValid()) {
+      return res.status(400).json({
+        message:
+          "⚠️ Ngày bắt đầu năm học không hợp lệ",
+      });
+    }
+
+    if (!end.isValid()) {
+      return res.status(400).json({
+        message:
+          "⚠️ Ngày kết thúc năm học không hợp lệ",
+      });
+    }
+
+    if (start.isAfter(end)) {
+      return res.status(400).json({
+        message:
+          "⚠️ Ngày bắt đầu không được lớn hơn ngày kết thúc năm học",
+      });
+    }
+
+    const weeks = [];
+
+    /*
+     * =======================================================
+     * TUẦN 1
+     * =======================================================
+     *
+     * Ngày bắt đầu chính là ngày người dùng chọn.
+     *
+     * Không ép ngày đó về Thứ 2.
+     *
+     * Tuần 1 kết thúc vào Chủ nhật.
+     *
+     * Dayjs:
+     * day() = 0 -> Chủ nhật
+     * day() = 1 -> Thứ 2
+     * ...
+     * day() = 6 -> Thứ 7
+     */
+
+    const firstDay = start.startOf("day");
+
+    const daysUntilSunday =
+      (7 - firstDay.day()) % 7;
+
+    let firstSunday = firstDay
+      .add(daysUntilSunday, "day")
+      .endOf("day");
+
+    /*
+     * Nếu ngày kết thúc năm học nằm trước
+     * Chủ nhật đầu tiên thì cắt tuần tại endSchoolYear.
+     */
+    if (firstSunday.isAfter(end)) {
+      firstSunday = end;
+    }
+
+    weeks.push({
+      startDate: firstDay.toDate(),
+      endDate: firstSunday.toDate(),
+      weekNumber: null,
+      isStudyWeek: false,
+    });
+
+    /*
+     * =======================================================
+     * CÁC TUẦN TIẾP THEO
+     * =======================================================
+     *
+     * Sau tuần đầu tiên:
+     *
+     * Thứ 2 -> Chủ nhật
+     * Thứ 2 -> Chủ nhật
+     * ...
+     */
+
+    let currentMonday =
+      firstSunday
+        .add(1, "day")
+        .startOf("day");
+
+    while (
+      currentMonday.isBefore(end) ||
+      currentMonday.isSame(end, "day")
+    ) {
+      const monday =
+        currentMonday.startOf("day");
+
+      let sunday = monday
+        .add(6, "day")
+        .endOf("day");
+
+      /*
+       * Nếu tuần cuối vượt quá ngày kết thúc
+       * năm học thì cắt tại ngày kết thúc.
+       */
+      if (sunday.isAfter(end)) {
+        sunday = end;
+      }
 
       weeks.push({
         startDate: monday.toDate(),
         endDate: sunday.toDate(),
+        weekNumber: null,
         isStudyWeek: false,
       });
 
-      // Sang tuần tiếp theo
-      current = monday.add(7, 'day');
+      currentMonday = monday.add(7, "day");
     }
 
-    // 🔄 Ghi lại dữ liệu vào MongoDB
+    /*
+     * Xoá toàn bộ tuần cũ.
+     *
+     * Đây là hành vi giống controller cũ.
+     */
     await AcademicWeek.deleteMany({});
-    await AcademicWeek.insertMany(weeks);
 
-    res.json({
-      message: `✅ Đã tạo ${weeks.length} tuần học (theo múi giờ Việt Nam)`,
-      weeks,
+    const insertedWeeks =
+      await AcademicWeek.insertMany(weeks);
+
+    return res.json({
+      message: `✅ Đã tạo ${insertedWeeks.length} khoảng tuần`,
+      weeks: insertedWeeks,
     });
   } catch (err) {
-    console.error('❌ Lỗi generateWeeks:', err);
-    res.status(500).json({ message: 'Lỗi server khi tạo danh sách tuần.' });
+    console.error(
+      "❌ Lỗi generateWeeks:",
+      err
+    );
+
+    return res.status(500).json({
+      message:
+        "Lỗi server khi tạo danh sách tuần.",
+    });
   }
 };
 
 /**
- * Get all weeks
+ * =========================================================
+ * GET ALL WEEKS
+ * =========================================================
  */
+
 exports.getWeeks = async (req, res) => {
   try {
-    const weeks = await AcademicWeek.find().sort('startDate');
-    res.json(weeks);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi server' });
-  }
-};
-
-/**
- * Bulk update weeks
- */
-exports.updateWeeksBulk = async (req, res) => {
-  try {
-    const updatedWeeks = req.body;
-
-    await AcademicWeek.deleteMany({});
-
-    let weekNumberCounter = 1;
-    const weeksToInsert = updatedWeeks.map((week) => {
-      const newWeek = {
-        startDate: week.startDate,
-        endDate: week.endDate,
-        isStudyWeek: week.isStudyWeek
-      };
-
-      if (week.isStudyWeek) {
-        newWeek.weekNumber = weekNumberCounter++;
-      } else {
-        newWeek.weekNumber = null;
-      }
-
-      return newWeek;
+    const weeks = await AcademicWeek.find().sort({
+      startDate: 1,
     });
 
-    await AcademicWeek.insertMany(weeksToInsert);
-
-    res.json({ message: 'Đã lưu danh sách tuần mới', weeks: weeksToInsert });
+    res.json(weeks);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi server' });
+    console.error(
+      "❌ Lỗi getWeeks:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Lỗi server",
+    });
   }
 };
 
 /**
- * Delete all weeks
+ * =========================================================
+ * BULK UPDATE
+ *
+ * Chỉ những tuần:
+ *
+ * isStudyWeek = true
+ *
+ * mới được đánh số:
+ *
+ * 1, 2, 3, 4...
+ *
+ * Các tuần nghỉ:
+ *
+ * weekNumber = null
+ * =========================================================
  */
+
+exports.updateWeeksBulk = async (req, res) => {
+  try {
+    const updatedWeeks = Array.isArray(
+      req.body
+    )
+      ? req.body
+      : [];
+
+    if (!updatedWeeks.length) {
+      return res.status(400).json({
+        message:
+          "Danh sách tuần không hợp lệ",
+      });
+    }
+
+    /*
+     * Sắp xếp theo ngày bắt đầu.
+     *
+     * Điều này đảm bảo dù frontend gửi thứ tự
+     * thế nào thì số tuần vẫn đúng thứ tự thời gian.
+     */
+    const sortedWeeks = [
+      ...updatedWeeks,
+    ].sort(
+      (a, b) =>
+        new Date(a.startDate).getTime() -
+        new Date(b.startDate).getTime()
+    );
+
+    let weekNumberCounter = 1;
+
+    const weeksToInsert =
+      sortedWeeks.map((week) => {
+        const isStudyWeek =
+          Boolean(week.isStudyWeek);
+
+        return {
+          startDate: week.startDate,
+          endDate: week.endDate,
+
+          isStudyWeek,
+
+          weekNumber: isStudyWeek
+            ? weekNumberCounter++
+            : null,
+        };
+      });
+
+    /*
+     * Xoá và ghi lại.
+     */
+    await AcademicWeek.deleteMany({});
+
+    const insertedWeeks =
+      await AcademicWeek.insertMany(
+        weeksToInsert
+      );
+
+    return res.json({
+      message:
+        "Đã lưu danh sách tuần mới",
+      weeks: insertedWeeks,
+    });
+  } catch (err) {
+    console.error(
+      "❌ Lỗi updateWeeksBulk:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Lỗi server",
+    });
+  }
+};
+
+/**
+ * =========================================================
+ * DELETE ALL
+ * =========================================================
+ */
+
 exports.deleteAllWeeks = async (req, res) => {
   try {
     await AcademicWeek.deleteMany({});
-    res.json({ message: 'Đã xoá toàn bộ tuần' });
+
+    res.json({
+      message:
+        "Đã xoá toàn bộ tuần",
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi server' });
+    console.error(
+      "❌ Lỗi deleteAllWeeks:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Lỗi server",
+    });
   }
 };
 
 /**
- * Get study weeks
+ * =========================================================
+ * GET STUDY WEEKS
+ *
+ * Chỉ trả về các tuần đã tick:
+ *
+ * isStudyWeek = true
+ *
+ * và sắp xếp theo:
+ *
+ * weekNumber
+ * =========================================================
  */
+
 exports.getStudyWeeks = async (req, res) => {
   try {
-    const weeks = await AcademicWeek.find({ isStudyWeek: true }).sort('weekNumber');
+    const weeks =
+      await AcademicWeek.find({
+        isStudyWeek: true,
+      }).sort({
+        weekNumber: 1,
+      });
+
     res.json(weeks);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Lỗi server' });
+    console.error(
+      "❌ Lỗi getStudyWeeks:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Lỗi server",
+    });
   }
 };
 
 /**
- * Get current study week (the week where today is between startDate and endDate)
+ * =========================================================
+ * GET CURRENT STUDY WEEK
+ *
+ * Tìm tuần học mà ngày hiện tại nằm trong đó.
+ *
+ * Chỉ xét:
+ *
+ * isStudyWeek = true
+ * =========================================================
  */
-exports.getCurrentStudyWeek = async (req, res) => {
-  try {
-    // ✅ Lấy đúng ngày theo múi giờ VN
-    const todayVN = dayjs().tz('Asia/Ho_Chi_Minh').toDate();
 
-    const currentWeek = await AcademicWeek.findOne({
-      startDate: { $lte: todayVN },
-      endDate: { $gte: todayVN },
-      isStudyWeek: true
-    }).lean();
+exports.getCurrentStudyWeek = async (
+  req,
+  res
+) => {
+  try {
+    const nowVN =
+      dayjs()
+        .tz(VN_TIMEZONE);
+
+    const todayStart =
+      nowVN.startOf("day").toDate();
+
+    const todayEnd =
+      nowVN.endOf("day").toDate();
+
+    const currentWeek =
+      await AcademicWeek.findOne({
+        isStudyWeek: true,
+
+        startDate: {
+          $lte: todayEnd,
+        },
+
+        endDate: {
+          $gte: todayStart,
+        },
+      }).sort({
+        weekNumber: 1,
+      });
 
     if (!currentWeek) {
-      return res.status(404).json({ message: 'Không tìm thấy tuần học hiện tại' });
+      return res.status(404).json({
+        message:
+          "Không tìm thấy tuần học hiện tại",
+      });
     }
 
     res.json(currentWeek);
   } catch (err) {
-    console.error('Lỗi getCurrentStudyWeek:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error(
+      "❌ Lỗi getCurrentStudyWeek:",
+      err
+    );
+
+    res.status(500).json({
+      error: "Server error",
+    });
   }
 };
