@@ -44,156 +44,228 @@ const getRuleByDescription = async (description) => {
 // Mỗi tuần reset về 100.
 // ============================================================
 
+// ============================================================
+// CẬP NHẬT ĐIỂM HẠNH KIỂM
+//
+// N1-N5: mỗi lỗi = -1 điểm
+// S1: không trừ điểm, nhưng đánh dấu nghiêm trọng
+//
+// Mỗi học sinh / lớp / năm học / tuần
+// có đúng 1 bản ghi.
+// ============================================================
+
 const updateStudentConductScore = async (
   studentName,
   className,
+  academicYear,
   weekNumber
 ) => {
-  if (!studentName || !className || weekNumber === undefined) {
-    return;
+  if (
+    !studentName ||
+    !className ||
+    !academicYear ||
+    weekNumber === undefined ||
+    weekNumber === null
+  ) {
+    console.error(
+      "updateStudentConductScore: thiếu dữ liệu",
+      {
+        studentName,
+        className,
+        academicYear,
+        weekNumber,
+      }
+    );
+
+    return null;
   }
 
   const name = normalizeName(studentName);
 
-  // Lấy tất cả lỗi của học sinh trong đúng tuần
-  const violations = await Violation.find({
-    name,
-    className,
-    weekNumber: Number(weekNumber),
-  });
+  const week = Number(weekNumber);
 
-  // --------------------------------------------
-  // Đếm số lỗi theo nhóm
-  // --------------------------------------------
+  // ==========================================================
+  // LẤY TẤT CẢ VI PHẠM CỦA HS TRONG ĐÚNG NĂM + TUẦN
+  // ==========================================================
 
-  const groupCounts = {
+  const violations =
+    await Violation.find({
+      name,
+      className,
+      academicYear,
+      weekNumber: week,
+    });
+
+  // ==========================================================
+  // ĐẾM VI PHẠM
+  // ==========================================================
+
+  const groupViolations = {
     N1: 0,
     N2: 0,
     N3: 0,
     N4: 0,
     N5: 0,
+    S1: 0,
   };
 
-  let seriousViolation = false;
+  // ==========================================================
+  // DUYỆT CÁC VI PHẠM
+  // ==========================================================
 
   for (const violation of violations) {
-    const rule = await getRuleByDescription(
-      violation.description
-    );
+    let groupCode =
+      violation.groupCode?.toUpperCase();
 
-    if (!rule) {
+    // --------------------------------------------------------
+    // Nếu database cũ chưa có groupCode
+    // thì tìm lại từ Rule
+    // --------------------------------------------------------
+
+    if (!groupCode) {
+      const rule =
+        await getRuleByDescription(
+          violation.description
+        );
+
+      groupCode =
+        rule?.groupCode?.toUpperCase();
+    }
+
+    if (!groupCode) {
       continue;
     }
 
-    const groupCode = rule.groupCode?.toUpperCase();
+    // --------------------------------------------------------
+    // N1-N5
+    // --------------------------------------------------------
 
-    // Nhóm lỗi hạnh kiểm
-    if (groupCode === 'N1') {
-      groupCounts.N1 += 1;
-    } else if (groupCode === 'N2') {
-      groupCounts.N2 += 1;
-    } else if (groupCode === 'N3') {
-      groupCounts.N3 += 1;
-    } else if (groupCode === 'N4') {
-      groupCounts.N4 += 1;
-    } else if (groupCode === 'N5') {
-      groupCounts.N5 += 1;
+    if (
+      groupCode === "N1" ||
+      groupCode === "N2" ||
+      groupCode === "N3" ||
+      groupCode === "N4" ||
+      groupCode === "N5"
+    ) {
+      groupViolations[groupCode] += 1;
     }
 
-    // Lỗi đặc biệt nghiêm trọng
-    if (groupCode === 'S1') {
-      seriousViolation = true;
+    // --------------------------------------------------------
+    // S1
+    // --------------------------------------------------------
+
+    if (groupCode === "S1") {
+      groupViolations.S1 += 1;
     }
   }
 
-  // --------------------------------------------
-  // Tổng số lần vi phạm dùng để trừ HK
-  // --------------------------------------------
+  // ==========================================================
+  // TỔNG VI PHẠM TÍNH HẠNH KIỂM
+  //
+  // N1 + N2 + N3 + N4 + N5
+  //
+  // S1 không trừ điểm
+  // ==========================================================
 
-  const totalConductPenalty =
-    groupCounts.N1 +
-    groupCounts.N2 +
-    groupCounts.N3 +
-    groupCounts.N4 +
-    groupCounts.N5;
+  const totalConductViolations =
+    groupViolations.N1 +
+    groupViolations.N2 +
+    groupViolations.N3 +
+    groupViolations.N4 +
+    groupViolations.N5;
 
-  // --------------------------------------------
-  // Điểm HK mặc định = 100
-  // --------------------------------------------
+  // ==========================================================
+  // TỔNG ĐIỂM TRỪ
+  // ==========================================================
 
-  const settings = await Setting.findOne();
+  const totalDeduction =
+    totalConductViolations;
 
-  const maxMerit =
-    settings?.maxMeritScore || 100;
+  // ==========================================================
+  // ĐIỂM HẠNH KIỂM
+  // ==========================================================
 
-  const score = Math.max(
-    maxMerit - totalConductPenalty,
-    0
+  const settings =
+    await Setting.findOne();
+
+  const maxScore =
+    Number(
+      settings?.maxConductScore ??
+      settings?.maxMeritScore ??
+      100
+    );
+
+  const finalScore =
+    Math.max(
+      0,
+      maxScore - totalDeduction
+    );
+
+  // ==========================================================
+  // LỖI NGHIÊM TRỌNG
+  // ==========================================================
+
+  const hasSeriousViolation =
+    groupViolations.S1 > 0;
+
+  // ==========================================================
+  // LƯU DATABASE
+  // ==========================================================
+
+  const score =
+    await StudentConductScore.findOneAndUpdate(
+      {
+        name,
+        className,
+        academicYear,
+        weekNumber: week,
+      },
+      {
+        $set: {
+          name,
+          className,
+          academicYear,
+          weekNumber: week,
+
+          maxScore,
+
+          groupViolations,
+
+          totalConductViolations,
+
+          totalDeduction,
+
+          finalScore,
+
+          hasSeriousViolation,
+
+          status: "DRAFT",
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      }
+    );
+
+  console.log(
+    "✅ Đã cập nhật điểm HK:",
+    {
+      name,
+      className,
+      academicYear,
+      weekNumber: week,
+      groupViolations,
+      totalConductViolations,
+      totalDeduction,
+      finalScore,
+      hasSeriousViolation,
+    }
   );
 
-  // --------------------------------------------
-  // Lưu điểm HK theo TUẦN
-  // --------------------------------------------
-
-  await StudentConductScore.findOneAndUpdate(
-    {
-      name,
-      className,
-      weekNumber: Number(weekNumber),
-    },
-    {
-      name,
-      className,
-      weekNumber: Number(weekNumber),
-
-      score,
-
-      N1: groupCounts.N1,
-      N2: groupCounts.N2,
-      N3: groupCounts.N3,
-      N4: groupCounts.N4,
-      N5: groupCounts.N5,
-
-      seriousViolation,
-
-      updatedAt: new Date(),
-    },
-    {
-      upsert: true,
-      new: true,
-      setDefaultsOnInsert: true,
-    }
-  );
-};
-
-// ============================================================
-// XÓA BẢN GHI HẠNH KIỂM NẾU HỌC SINH KHÔNG CÒN VI PHẠM
-// ============================================================
-
-const cleanupStudentConductScore = async (
-  studentName,
-  className,
-  weekNumber
-) => {
-  if (!studentName || !className || weekNumber === undefined) {
-    return;
-  }
-
-  const name = normalizeName(studentName);
-
-  const count = await Violation.countDocuments({
-    name,
-    className,
-    weekNumber: Number(weekNumber),
-  });
-
-  if (count === 0) {
-    await StudentConductScore.deleteOne({
-      name,
-      className,
-      weekNumber: Number(weekNumber),
-    });
-  }
+  return score;
 };
 
 // ============================================================
@@ -408,6 +480,7 @@ if (!academicYear) {
     await updateStudentConductScore(
       name,
       className,
+      academicYear,
       Number(weekNumber)
     );
 
@@ -612,10 +685,11 @@ exports.deleteViolation = async (
     // --------------------------------------------
 
     const {
-      name,
-      className,
-      weekNumber,
-    } = violation;
+  name,
+  className,
+  academicYear,
+  weekNumber,
+} = violation;
 
     // --------------------------------------------
     // Nếu vẫn còn lỗi trong tuần
@@ -625,17 +699,19 @@ exports.deleteViolation = async (
     // → xóa bản ghi HK tuần đó
     // --------------------------------------------
 
-    await cleanupStudentConductScore(
-      name,
-      className,
-      weekNumber
-    );
+await cleanupStudentConductScore(
+  name,
+  className,
+  academicYear,
+  weekNumber
+);
 
-    await updateStudentConductScore(
-      name,
-      className,
-      weekNumber
-    );
+await updateStudentConductScore(
+  name,
+  className,
+  academicYear,
+  weekNumber
+);
 
     res.status(200).json({
       message:
