@@ -89,12 +89,47 @@ const updateStudentConductScore = async (
   // ==========================================================
 
   const violations =
-    await Violation.find({
-      name,
-      className,
-      academicYear,
-      weekNumber: week,
-    });
+  await Violation.find({
+    name,
+    className,
+    academicYear,
+    weekNumber: week,
+  });
+
+console.log(
+  "================ KIỂM TRA TÍNH HK ================"
+);
+
+console.log("🔎 Điều kiện tìm Violation:");
+console.log({
+  name,
+  className,
+  academicYear,
+  weekNumber: week,
+});
+
+console.log(
+  "📌 Số Violation tìm được:",
+  violations.length
+);
+
+console.log(
+  "📌 Các Violation tìm được:",
+  violations.map((v) => ({
+    id: v._id,
+    name: v.name,
+    className: v.className,
+    academicYear: v.academicYear,
+    weekNumber: v.weekNumber,
+    groupCode: v.groupCode,
+    ruleCode: v.ruleCode,
+    description: v.description,
+  }))
+);
+
+console.log(
+  "=================================================="
+);
 
   // ==========================================================
   // ĐẾM VI PHẠM
