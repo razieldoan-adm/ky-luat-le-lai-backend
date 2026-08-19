@@ -290,35 +290,59 @@ exports.createViolation = async (
 ) => {
   try {
     const {
-      className,
-      description,
-      handlingMethod,
-      handledBy,
-      handlingNote,
-      weekNumber,
-      time,
-      name: rawName,
-    } = req.body;
+  className,
+  description,
+
+  ruleCode,
+  groupCode,
+
+  academicYear,
+
+  handlingMethod,
+  handledBy,
+  handlingNote,
+
+  weekNumber,
+  time,
+
+  name: rawName,
+} = req.body;
 
     if (
-      !rawName ||
-      !description ||
-      !className
-    ) {
-      return res.status(400).json({
-        error:
-          'Thiếu thông tin bắt buộc (name, description, className)',
-      });
-    }
+  !rawName ||
+  !description ||
+  !className
+) {
+  return res.status(400).json({
+    error:
+      'Thiếu thông tin bắt buộc (name, description, className)',
+  });
+}
 
-    if (
-      weekNumber === undefined ||
-      weekNumber === null
-    ) {
-      return res.status(400).json({
-        error: 'Thiếu weekNumber',
-      });
-    }
+if (
+  !ruleCode ||
+  !groupCode
+) {
+  return res.status(400).json({
+    error:
+      'Thiếu ruleCode hoặc groupCode',
+  });
+}
+
+if (
+  weekNumber === undefined ||
+  weekNumber === null
+) {
+  return res.status(400).json({
+    error: 'Thiếu weekNumber',
+  });
+}
+
+if (!academicYear) {
+  return res.status(400).json({
+    error: 'Thiếu academicYear',
+  });
+}
 
     const name = normalizeName(rawName);
 
@@ -344,30 +368,36 @@ exports.createViolation = async (
         : 0;
 
     const violation =
-      new Violation({
-        name,
-        className,
-        description,
-        penalty,
+  new Violation({
+    name,
+    className,
+    description,
 
-        handlingMethod:
-          handlingMethod || '',
+    ruleCode,
+    groupCode,
 
-        handledBy:
-          handledBy || '',
+    academicYear,
 
-        handlingNote:
-          handlingNote || '',
+    penalty,
 
-        handled: !!handledBy,
+    handlingMethod:
+      handlingMethod || '',
 
-        weekNumber:
-          Number(weekNumber),
+    handledBy:
+      handledBy || '',
 
-        time: time
-          ? new Date(time)
-          : new Date(),
-      });
+    handlingNote:
+      handlingNote || '',
+
+    handled: !!handledBy,
+
+    weekNumber:
+      Number(weekNumber),
+
+    time: time
+      ? new Date(time)
+      : new Date(),
+  });
 
     await violation.save();
 
