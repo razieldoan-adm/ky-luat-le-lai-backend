@@ -700,17 +700,24 @@ exports.deleteViolation = async (
     // --------------------------------------------
 
 await cleanupStudentConductScore(
-  name,
-  className,
-  academicYear,
-  weekNumber
+  oldName,
+  oldClassName,
+  violation.academicYear,
+  oldWeekNumber
 );
 
 await updateStudentConductScore(
-  name,
-  className,
-  academicYear,
-  weekNumber
+  oldName,
+  oldClassName,
+  violation.academicYear,
+  oldWeekNumber
+);
+
+await updateStudentConductScore(
+  violation.name,
+  violation.className,
+  violation.academicYear,
+  violation.weekNumber
 );
 
     res.status(200).json({
