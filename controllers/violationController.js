@@ -267,6 +267,56 @@ const updateStudentConductScore = async (
 
   return score;
 };
+ // ============================================================
+// XÓA BẢN GHI HK NẾU HS KHÔNG CÒN VI PHẠM TRONG TUẦN
+// ============================================================
+
+const cleanupStudentConductScore = async (
+  studentName,
+  className,
+  academicYear,
+  weekNumber
+) => {
+  if (
+    !studentName ||
+    !className ||
+    !academicYear ||
+    weekNumber === undefined ||
+    weekNumber === null
+  ) {
+    return;
+  }
+
+  const name = normalizeName(studentName);
+  const week = Number(weekNumber);
+
+  const count = await Violation.countDocuments({
+    name,
+    className,
+    academicYear,
+    weekNumber: week,
+  });
+
+  // Không còn vi phạm
+  if (count === 0) {
+    await StudentConductScore.deleteOne({
+      name,
+      className,
+      academicYear,
+      weekNumber: week,
+    });
+
+    console.log(
+      "🗑️ Đã xóa bản ghi HK vì HS không còn vi phạm:",
+      {
+        name,
+        className,
+        academicYear,
+        weekNumber: week,
+      }
+    );
+  }
+};
 
 // ============================================================
 // 🔎 TÌM HỌC SINH
@@ -663,76 +713,66 @@ exports.markViolationHandled = async (
 // ❌ XÓA VI PHẠM
 // ============================================================
 
-exports.deleteViolation = async (
-  req,
-  res
-) => {
+exports.deleteViolation = async (req, res) => {
   try {
     const { id } = req.params;
 
     const violation =
-      await Violation.findByIdAndDelete(id);
+      await Violation.findById(id);
 
     if (!violation) {
       return res.status(404).json({
-        error:
-          'Không tìm thấy vi phạm để xoá.',
+        error: "Không tìm thấy vi phạm để xoá.",
       });
     }
 
-    // --------------------------------------------
-    // Lưu lại thông tin cũ trước khi xóa
-    // --------------------------------------------
+    // Lưu thông tin cũ trước khi xóa
+    const oldName = violation.name;
+    const oldClassName = violation.className;
+    const oldAcademicYear = violation.academicYear;
+    const oldWeekNumber = violation.weekNumber;
 
-    const {
-  name,
-  className,
-  academicYear,
-  weekNumber,
-} = violation;
+    // Xóa vi phạm
+    await Violation.findByIdAndDelete(id);
 
-    // --------------------------------------------
-    // Nếu vẫn còn lỗi trong tuần
-    // → tính lại
-    //
-    // Nếu không còn lỗi
-    // → xóa bản ghi HK tuần đó
-    // --------------------------------------------
+    // Nếu không còn lỗi → xóa bản ghi HK
+    await cleanupStudentConductScore(
+      oldName,
+      oldClassName,
+      oldAcademicYear,
+      oldWeekNumber
+    );
 
-await cleanupStudentConductScore(
-  oldName,
-  oldClassName,
-  violation.academicYear,
-  oldWeekNumber
-);
+    // Nếu vẫn còn lỗi → tính lại HK
+    const remainingCount =
+      await Violation.countDocuments({
+        name: normalizeName(oldName),
+        className: oldClassName,
+        academicYear: oldAcademicYear,
+        weekNumber: Number(oldWeekNumber),
+      });
 
-await updateStudentConductScore(
-  oldName,
-  oldClassName,
-  violation.academicYear,
-  oldWeekNumber
-);
-
-await updateStudentConductScore(
-  violation.name,
-  violation.className,
-  violation.academicYear,
-  violation.weekNumber
-);
+    if (remainingCount > 0) {
+      await updateStudentConductScore(
+        oldName,
+        oldClassName,
+        oldAcademicYear,
+        oldWeekNumber
+      );
+    }
 
     res.status(200).json({
       message:
-        'Đã xoá vi phạm và cập nhật điểm hạnh kiểm.',
+        "Đã xoá vi phạm và cập nhật điểm hạnh kiểm.",
     });
   } catch (error) {
     console.error(
-      '❌ Lỗi khi xoá vi phạm:',
+      "❌ Lỗi khi xoá vi phạm:",
       error
     );
 
     res.status(500).json({
-      error:
-        'Không thể xoá vi phạm.',
+      error: "Không thể xoá vi phạm.",
     });
   }
 };
@@ -983,20 +1023,28 @@ exports.updateViolation =
       // --------------------------------------------
 
       if (description) {
-        violation.description =
-          description;
+  violation.description = description;
 
-        const rule =
-          await getRuleByDescription(
-            description
-          );
+  const rule =
+    await getRuleByDescription(
+      description
+    );
 
-        violation.penalty =
-          rule &&
-          typeof rule.point === 'number'
-            ? rule.point
-            : 0;
-      }
+  if (rule) {
+    violation.penalty =
+      typeof rule.point === "number"
+        ? rule.point
+        : 0;
+
+    violation.ruleCode =
+      rule.ruleCode;
+
+    violation.groupCode =
+      rule.groupCode;
+  } else {
+    violation.penalty = 0;
+  }
+}
 
       // --------------------------------------------
       // Cập nhật tuần
@@ -1054,33 +1102,36 @@ exports.updateViolation =
         Number(oldWeekNumber) !==
         Number(violation.weekNumber);
 
-      if (
-        changedStudent ||
-        changedClass ||
-        changedWeek
-      ) {
-        await cleanupStudentConductScore(
-          oldName,
-          oldClassName,
-          oldWeekNumber
-        );
+if (
+  changedStudent ||
+  changedClass ||
+  changedWeek
+) {
+  await cleanupStudentConductScore(
+    oldName,
+    oldClassName,
+    violation.academicYear,
+    oldWeekNumber
+  );
 
-        await updateStudentConductScore(
-          oldName,
-          oldClassName,
-          oldWeekNumber
-        );
-      }
+  await updateStudentConductScore(
+    oldName,
+    oldClassName,
+    violation.academicYear,
+    oldWeekNumber
+  );
+}
 
       // --------------------------------------------
       // Tính lại HK cho bản ghi mới
       // --------------------------------------------
 
       await updateStudentConductScore(
-        violation.name,
-        violation.className,
-        violation.weekNumber
-      );
+  violation.name,
+  violation.className,
+  violation.academicYear,
+  violation.weekNumber
+);
 
       res.json({
         message:
