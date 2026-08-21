@@ -786,73 +786,246 @@ exports.markViolationHandled = async (
 // ❌ XÓA VI PHẠM
 // ============================================================
 
-exports.deleteViolation = async (
-  req,
-  res
-) => {
+exports.deleteViolation = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const violation =
-      await Violation.findById(id);
+    // ==========================================================
+    // 1. TÌM VI PHẠM TRƯỚC KHI XÓA
+    // ==========================================================
+
+    const violation = await Violation.findById(id);
 
     if (!violation) {
       return res.status(404).json({
-        error:
-          "Không tìm thấy vi phạm để xoá.",
+        message: "Không tìm thấy vi phạm",
       });
     }
 
-    // ========================================================
-    // LƯU THÔNG TIN TRƯỚC KHI XÓA
-    // ========================================================
+    // Lấy đúng nhóm của lỗi đang xóa
+    const groupCode =
+      violation.groupCode?.trim().toUpperCase();
 
-    const oldName =
-      violation.name;
+    console.log("🗑️ XÓA VI PHẠM:", {
+      id: violation._id,
+      name: violation.name,
+      className: violation.className,
+      academicYear: violation.academicYear,
+      weekNumber: violation.weekNumber,
+      groupCode,
+      ruleCode: violation.ruleCode,
+      description: violation.description,
+    });
 
-    const oldClassName =
-      violation.className;
+    // Chỉ cho phép các nhóm hợp lệ
+    const validGroups = [
+      "N1",
+      "N2",
+      "N3",
+      "N4",
+      "N5",
+      "S1",
+    ];
 
-    const oldAcademicYear =
-      violation.academicYear;
+    if (!validGroups.includes(groupCode)) {
+      return res.status(400).json({
+        message:
+          `Vi phạm không có groupCode hợp lệ: ${groupCode || "không có"}`,
+      });
+    }
 
-    const oldWeekNumber =
-      violation.weekNumber;
-
-    // ========================================================
-    // XÓA VIOLATION
-    // ========================================================
+    // ==========================================================
+    // 2. XÓA VI PHẠM
+    // ==========================================================
 
     await Violation.findByIdAndDelete(id);
 
-    // ========================================================
-    // TÍNH LẠI HK
-    // ========================================================
+    // ==========================================================
+    // 3. TÌM CONDUCT SCORE CỦA ĐÚNG HỌC SINH + TUẦN
+    // ==========================================================
 
     const conductScore =
-      await updateStudentConductScore(
-        oldName,
-        oldClassName,
-        oldAcademicYear,
-        oldWeekNumber
+      await StudentConductScore.findOne({
+        name: violation.name,
+        className: violation.className,
+        academicYear: violation.academicYear,
+        weekNumber: Number(
+          violation.weekNumber
+        ),
+      });
+
+    // Nếu chưa có ConductScore thì vi phạm vẫn đã được xóa
+    if (!conductScore) {
+      console.warn(
+        "⚠️ Đã xóa vi phạm nhưng không tìm thấy ConductScore:",
+        {
+          name: violation.name,
+          className: violation.className,
+          academicYear:
+            violation.academicYear,
+          weekNumber:
+            violation.weekNumber,
+        }
       );
 
-    res.status(200).json({
-      message:
-        "Đã xoá vi phạm và cập nhật điểm hạnh kiểm.",
-      conductScore,
-    });
-  } catch (error) {
-    console.error(
-      "❌ deleteViolation:",
-      error
+      return res.json({
+        message:
+          "Đã xóa vi phạm. Không tìm thấy ConductScore để cập nhật.",
+      });
+    }
+
+    // ==========================================================
+    // 4. LẤY CÁC NHÓM HIỆN TẠI
+    // ==========================================================
+
+    const groups = {
+      N1:
+        Number(
+          conductScore.groupViolations?.N1
+        ) || 0,
+
+      N2:
+        Number(
+          conductScore.groupViolations?.N2
+        ) || 0,
+
+      N3:
+        Number(
+          conductScore.groupViolations?.N3
+        ) || 0,
+
+      N4:
+        Number(
+          conductScore.groupViolations?.N4
+        ) || 0,
+
+      N5:
+        Number(
+          conductScore.groupViolations?.N5
+        ) || 0,
+
+      S1:
+        Number(
+          conductScore.groupViolations?.S1
+        ) || 0,
+    };
+
+    // ==========================================================
+    // 5. TRỪ ĐÚNG NHÓM CỦA LỖI VỪA XÓA
+    // ==========================================================
+
+    groups[groupCode] = Math.max(
+      0,
+      groups[groupCode] - 1
     );
 
-    res.status(500).json({
+    console.log(
+      "📊 CONDUCT SCORE SAU KHI TRỪ NHÓM:",
+      {
+        groupCode,
+        groupViolations: groups,
+      }
+    );
+
+    // ==========================================================
+    // 6. TÍNH LẠI TỔNG LỖI HẠNH KIỂM
+    //    S1 KHÔNG TÍNH VÀO TỔNG LỖI TRỪ ĐIỂM
+    // ==========================================================
+
+    const totalConductViolations =
+      groups.N1 +
+      groups.N2 +
+      groups.N3 +
+      groups.N4 +
+      groups.N5;
+
+    // Mỗi lỗi N1-N5 = -1 điểm
+    const totalDeduction =
+      totalConductViolations;
+
+    const maxScore =
+      Number(conductScore.maxScore) || 100;
+
+    const finalScore = Math.max(
+      0,
+      maxScore - totalDeduction
+    );
+
+    // ==========================================================
+    // 7. CẬP NHẬT CONDUCT SCORE
+    // ==========================================================
+
+    conductScore.groupViolations =
+      groups;
+
+    conductScore.totalConductViolations =
+      totalConductViolations;
+
+    conductScore.totalDeduction =
+      totalDeduction;
+
+    conductScore.finalScore =
+      finalScore;
+
+    conductScore.hasSeriousViolation =
+      groups.S1 > 0;
+
+    await conductScore.save();
+
+    // ==========================================================
+    // 8. LOG KIỂM TRA
+    // ==========================================================
+
+    console.log(
+      "✅ ĐÃ CẬP NHẬT CONDUCT SCORE SAU KHI XÓA:",
+      {
+        name: conductScore.name,
+        className: conductScore.className,
+        academicYear:
+          conductScore.academicYear,
+        weekNumber:
+          conductScore.weekNumber,
+
+        groupViolations:
+          conductScore.groupViolations,
+
+        totalConductViolations:
+          conductScore.totalConductViolations,
+
+        totalDeduction:
+          conductScore.totalDeduction,
+
+        finalScore:
+          conductScore.finalScore,
+
+        hasSeriousViolation:
+          conductScore.hasSeriousViolation,
+      }
+    );
+
+    // ==========================================================
+    // 9. TRẢ KẾT QUẢ
+    // ==========================================================
+
+    return res.json({
+      message:
+        "Đã xóa vi phạm và cập nhật điểm hạnh kiểm.",
+
+      deletedViolationId: id,
+
+      conductScore,
+    });
+  } catch (err) {
+    console.error(
+      "❌ Lỗi deleteViolation:",
+      err
+    );
+
+    return res.status(500).json({
+      message:
+        "Lỗi server khi xóa vi phạm.",
       error:
-        "Không thể xoá vi phạm.",
-      detail:
-        error.message,
+        err.message,
     });
   }
 };
