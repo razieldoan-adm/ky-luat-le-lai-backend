@@ -95,6 +95,10 @@ exports.getStudentScore = async (req, res) => {
       weekNumber,
     } = req.query;
 
+    // ========================================================
+    // VALIDATE
+    // ========================================================
+
     if (
       !name ||
       !className ||
@@ -103,28 +107,74 @@ exports.getStudentScore = async (req, res) => {
     ) {
       return res.status(400).json({
         message:
-          'Thiếu name, className, academicYear hoặc weekNumber',
+          "Thiếu name, className, academicYear hoặc weekNumber",
       });
     }
 
+    // ========================================================
+    // CHUẨN HÓA DỮ LIỆU
+    // ========================================================
+
+    const normalizedName =
+      normalizeName(name);
+
+    const normalizedClass =
+      normalizeClass(className);
+
+    const normalizedAcademicYear =
+      String(academicYear).trim();
+
+    const week =
+      Number(weekNumber);
+
+    console.log(
+      "🔎 TÌM CONDUCT SCORE:",
+      {
+        originalName: name,
+        normalizedName,
+        originalClass: className,
+        normalizedClass,
+        academicYear:
+          normalizedAcademicYear,
+        weekNumber: week,
+      }
+    );
+
+    // ========================================================
+    // TÌM CONDUCT SCORE
+    // ========================================================
+
     const score =
       await StudentConductScore.findOne({
-        name,
-        className,
-        academicYear,
-        weekNumber: Number(weekNumber),
+        name: normalizedName,
+        className: normalizedClass,
+        academicYear:
+          normalizedAcademicYear,
+        weekNumber: week,
       });
 
-    /**
-     * Nếu chưa có bản ghi:
-     * trả về dữ liệu mặc định DRAFT.
-     */
+    // ========================================================
+    // KHÔNG TÌM THẤY
+    // ========================================================
+
     if (!score) {
+      console.log(
+        "⚠️ KHÔNG TÌM THẤY CONDUCT SCORE:",
+        {
+          name: normalizedName,
+          className: normalizedClass,
+          academicYear:
+            normalizedAcademicYear,
+          weekNumber: week,
+        }
+      );
+
       return res.json({
-        name,
-        className,
-        academicYear,
-        weekNumber: Number(weekNumber),
+        name: normalizedName,
+        className: normalizedClass,
+        academicYear:
+          normalizedAcademicYear,
+        weekNumber: week,
 
         maxScore: 100,
 
@@ -143,23 +193,49 @@ exports.getStudentScore = async (req, res) => {
 
         hasSeriousViolation: false,
 
-        status: 'DRAFT',
+        status: "DRAFT",
       });
     }
 
-    res.json(score);
+    // ========================================================
+    // TÌM THẤY
+    // ========================================================
+
+    console.log(
+      "✅ TÌM THẤY CONDUCT SCORE:",
+      {
+        _id: score._id,
+        name: score.name,
+        className: score.className,
+        academicYear:
+          score.academicYear,
+        weekNumber:
+          score.weekNumber,
+        groupViolations:
+          score.groupViolations,
+        totalConductViolations:
+          score.totalConductViolations,
+        totalDeduction:
+          score.totalDeduction,
+        finalScore:
+          score.finalScore,
+      }
+    );
+
+    return res.json(score);
+
   } catch (err) {
     console.error(
-      'getStudentScore error:',
+      "❌ getStudentScore error:",
       err
     );
 
-    res.status(500).json({
-      message: 'Server error',
+    return res.status(500).json({
+      message: "Server error",
+      detail: err.message,
     });
   }
 };
-
 
 /**
  * =====================================================
