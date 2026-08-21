@@ -112,16 +112,39 @@ const updateStudentConductScore = async (
     return null;
   }
 
-  // ==========================================================
-  // LẤY TOÀN BỘ VI PHẠM CỦA HS TRONG TUẦN
-  // ==========================================================
+// ==========================================================
+// LẤY TOÀN BỘ VI PHẠM CỦA HS TRONG TUẦN
+// ==========================================================
 
-  const violations = await Violation.find({
-    name,
-    className: classNormalized,
-    academicYear: String(academicYear).trim(),
-    weekNumber: week,
-  });
+const violations = await Violation.find({
+  name: name,
+  className: classNormalized,
+  weekNumber: week,
+});
+
+console.log("🔍 KIỂM TRA VI PHẠM:");
+console.log({
+  queryName: name,
+  queryClass: classNormalized,
+  queryWeek: week,
+  queryAcademicYear: String(academicYear).trim(),
+  totalFound: violations.length,
+});
+
+if (violations.length > 0) {
+  console.log(
+    "📋 VI PHẠM TÌM ĐƯỢC:",
+    violations.map((v) => ({
+      _id: v._id,
+      name: v.name,
+      className: v.className,
+      academicYear: v.academicYear,
+      weekNumber: v.weekNumber,
+      groupCode: v.groupCode,
+      ruleCode: v.ruleCode,
+    }))
+  );
+}
 
   console.log(
     "================================================"
