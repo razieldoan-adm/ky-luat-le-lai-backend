@@ -15,14 +15,18 @@ const violationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-
+      academicYear: {
+  type: String,
+  required: true,
+  trim: true,
+    },
     // ==========================================
     // NHÓM LỖI - CBB1
     //
     // N1 -> N5: tính điểm hạnh kiểm
     // S1: đặc biệt nghiêm trọng
     // ==========================================
-
+  
     groupCode: {
       type: String,
       required: true,
@@ -150,12 +154,15 @@ violationSchema.index({
 // Tìm lỗi theo nhóm
 violationSchema.index({
   groupCode: 1,
+  academicYear: 1,
   weekNumber: 1,
+ 
 });
 
 // Tìm lỗi theo mã lỗi
 violationSchema.index({
   ruleCode: 1,
+  academicYear: 1,
   weekNumber: 1,
 });
 
