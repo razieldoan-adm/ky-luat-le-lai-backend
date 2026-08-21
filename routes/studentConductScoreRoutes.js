@@ -23,7 +23,7 @@ const {
 
 router.get(
   '/',
-  verifyToken,
+  
   getAllScores
 );
 
