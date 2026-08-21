@@ -111,45 +111,54 @@ exports.getStudentScore = async (req, res) => {
       });
     }
 
-    // ========================================================
-    // CHUẨN HÓA DỮ LIỆU
-    // ========================================================
+    const queryName =
+      String(name).trim();
 
-    const normalizedName =
-      normalizeName(name);
+    const queryClass =
+      String(className).trim();
 
-    const normalizedClass =
-      normalizeClass(className);
-
-    const normalizedAcademicYear =
+    const queryAcademicYear =
       String(academicYear).trim();
 
     const week =
       Number(weekNumber);
 
+    if (!Number.isInteger(week) || week < 1) {
+      return res.status(400).json({
+        message: "weekNumber không hợp lệ",
+      });
+    }
+
     console.log(
       "🔎 TÌM CONDUCT SCORE:",
       {
-        originalName: name,
-        normalizedName,
-        originalClass: className,
-        normalizedClass,
-        academicYear:
-          normalizedAcademicYear,
+        name: queryName,
+        className: queryClass,
+        academicYear: queryAcademicYear,
         weekNumber: week,
       }
     );
 
     // ========================================================
     // TÌM CONDUCT SCORE
+    // Không phân biệt chữ hoa / chữ thường ở tên
     // ========================================================
 
     const score =
       await StudentConductScore.findOne({
-        name: normalizedName,
-        className: normalizedClass,
+        name: {
+          $regex: `^${queryName.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+          )}$`,
+          $options: "i",
+        },
+
+        className: queryClass,
+
         academicYear:
-          normalizedAcademicYear,
+          queryAcademicYear,
+
         weekNumber: week,
       });
 
@@ -161,19 +170,19 @@ exports.getStudentScore = async (req, res) => {
       console.log(
         "⚠️ KHÔNG TÌM THẤY CONDUCT SCORE:",
         {
-          name: normalizedName,
-          className: normalizedClass,
+          name: queryName,
+          className: queryClass,
           academicYear:
-            normalizedAcademicYear,
+            queryAcademicYear,
           weekNumber: week,
         }
       );
 
       return res.json({
-        name: normalizedName,
-        className: normalizedClass,
+        name: queryName,
+        className: queryClass,
         academicYear:
-          normalizedAcademicYear,
+          queryAcademicYear,
         weekNumber: week,
 
         maxScore: 100,
@@ -236,7 +245,6 @@ exports.getStudentScore = async (req, res) => {
     });
   }
 };
-
 /**
  * =====================================================
  * TẠO / CẬP NHẬT ĐIỂM HẠNH KIỂM
