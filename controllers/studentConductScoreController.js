@@ -1,4 +1,5 @@
 const StudentConductScore = require('../models/StudentConductScore');
+const Student = require('../models/Student');
 
 /**
  * =====================================================
@@ -419,154 +420,143 @@ exports.finalizeClassWeek = async (req, res) => {
       weekNumber,
     } = req.body;
 
-    // ================================================
-    // KIỂM TRA DỮ LIỆU
-    // ================================================
+    // ==========================================
+    // KIỂM TRA
+    // ==========================================
 
-    if (
-      !academicYear ||
-      !weekNumber
-    ) {
+    if (!academicYear || !weekNumber) {
       return res.status(400).json({
-        message:
-          'Thiếu academicYear hoặc weekNumber',
+        message: 'Thiếu academicYear hoặc weekNumber',
       });
     }
 
     const week = Number(weekNumber);
 
-    if (
-      !Number.isInteger(week) ||
-      week < 1
-    ) {
+    if (!Number.isInteger(week) || week < 1) {
       return res.status(400).json({
-        message:
-          'weekNumber không hợp lệ',
+        message: 'weekNumber không hợp lệ',
       });
     }
 
-    // ================================================
-    // LẤY TOÀN BỘ HỌC SINH CỦA TUẦN
-    // ================================================
+    // ==========================================
+    // LẤY TOÀN BỘ HỌC SINH TOÀN TRƯỜNG
+    // ==========================================
 
-    const scores =
-      await StudentConductScore.find({
-        academicYear,
-        weekNumber: week,
-      });
+    const students = await Student.find({})
+      .select('name className')
+      .lean();
 
-    // ================================================
-    // KHÔNG CÓ DỮ LIỆU
-    // ================================================
-
-    if (!scores.length) {
+    if (!students.length) {
       return res.status(404).json({
-        message:
-          `Chưa có dữ liệu hạnh kiểm tuần ${week} của toàn trường`,
+        message: 'Không có học sinh trong hệ thống',
       });
     }
 
-    // ================================================
-    // ĐẾM BẢN GHI ĐÃ FINAL
-    // ================================================
+    // ==========================================
+    // XỬ LÝ TỪNG HỌC SINH
+    // ==========================================
 
-    const finalCount =
-      scores.filter(
-        (score) =>
-          score.status === 'FINAL'
-      ).length;
+    let created = 0;
+    let finalized = 0;
+    let alreadyFinal = 0;
 
-    // ================================================
-    // NẾU TẤT CẢ ĐÃ FINAL
-    // ================================================
+    for (const student of students) {
 
-    if (
-      finalCount ===
-      scores.length
-    ) {
-      return res.json({
-        message:
-          `Hạnh kiểm tuần ${week} toàn trường đã được duyệt trước đó`,
-
-        academicYear,
-
-        weekNumber: week,
-
-        existing:
-          scores.length,
-
-        alreadyFinal:
-          finalCount,
-
-        modified: 0,
-
-        totalFinal:
-          finalCount,
-
-        alreadyFinalAll: true,
-      });
-    }
-
-    // ================================================
-    // DUYỆT TOÀN BỘ TUẦN
-    // ================================================
-
-    const result =
-      await StudentConductScore.updateMany(
-        {
+      const existing =
+        await StudentConductScore.findOne({
+          name: student.name,
+          className: student.className,
           academicYear,
           weekNumber: week,
-          status: {
-            $ne: 'FINAL',
-          },
-        },
-        {
-          $set: {
-            status: 'FINAL',
-          },
+        });
+
+      // ------------------------------------------
+      // ĐÃ CÓ RECORD
+      // ------------------------------------------
+
+      if (existing) {
+
+        if (existing.status === 'FINAL') {
+          alreadyFinal++;
+        } else {
+          existing.status = 'FINAL';
+          await existing.save();
+
+          finalized++;
         }
-      );
 
-    const modified =
-      result.modifiedCount ??
-      result.nModified ??
-      0;
+        continue;
+      }
 
-    // ================================================
-    // TRẢ KẾT QUẢ
-    // ================================================
+      // ------------------------------------------
+      // CHƯA CÓ RECORD
+      // → TẠO RECORD FINAL
+      // ------------------------------------------
 
-    res.json({
+      await StudentConductScore.create({
+        name: student.name,
+        className: student.className,
+
+        academicYear,
+        weekNumber: week,
+
+        groupViolations: {
+          N1: 0,
+          N2: 0,
+          N3: 0,
+          N4: 0,
+          N5: 0,
+          S1: 0,
+        },
+
+        totalConductViolations: 0,
+        totalDeduction: 0,
+
+        maxScore: 100,
+        finalScore: 100,
+
+        hasSeriousViolation: false,
+
+        status: 'FINAL',
+      });
+
+      created++;
+    }
+
+    // ==========================================
+    // KẾT QUẢ
+    // ==========================================
+
+    const totalFinal =
+      created +
+      finalized +
+      alreadyFinal;
+
+    return res.json({
       message:
         `Đã duyệt hạnh kiểm tuần ${week} toàn trường`,
 
       academicYear,
-
       weekNumber: week,
 
-      existing:
-        scores.length,
+      totalStudents: students.length,
 
-      alreadyFinal:
-        finalCount,
+      created,
+      finalized,
+      alreadyFinal,
 
-      modified,
-
-      totalFinal:
-        finalCount + modified,
-
-      alreadyFinalAll: false,
+      totalFinal,
     });
 
   } catch (err) {
     console.error(
-      'finalizeClassWeek error:',
+      '❌ finalizeClassWeek error:',
       err
     );
 
-    res.status(500).json({
-      message:
-        'Server error',
+    return res.status(500).json({
+      message: 'Lỗi duyệt hạnh kiểm toàn trường',
+      error: err.message,
     });
   }
 };
