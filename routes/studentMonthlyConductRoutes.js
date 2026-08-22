@@ -16,7 +16,6 @@ const {
 
 router.get(
   "/",
-  verifyToken,
   controller.getMonthlyConduct
 );
 
