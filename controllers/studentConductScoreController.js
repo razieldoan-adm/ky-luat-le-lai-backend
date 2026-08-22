@@ -395,120 +395,125 @@ exports.finalizeScore = async (req, res) => {
 
 /**
  * =====================================================
- * CHỐT TOÀN BỘ HỌC SINH CỦA 1 LỚP / 1 TUẦN
+ * DUYỆT TOÀN BỘ HỌC SINH TOÀN TRƯỜNG CỦA 1 TUẦN
  * =====================================================
- *
- * Đây là chức năng BGH/Admin sử dụng.
  *
  * Ví dụ:
  *
  * {
- *   "className": "6A1",
  *   "academicYear": "2026-2027",
  *   "weekNumber": 1
  * }
  *
- * Tất cả bản ghi của lớp + tuần đó
- * sẽ chuyển:
+ * Một lần duyệt sẽ chuyển toàn bộ học sinh
+ * của tuần đó sang FINAL.
  *
- * DRAFT → FINAL
- *
- * Không cần chốt từng học sinh.
+ * Sau khi FINAL vẫn cho phép cập nhật.
+ * Nếu có bản ghi trở lại DRAFT thì lần duyệt tiếp
+ * theo sẽ chuyển lại toàn bộ sang FINAL.
  */
 exports.finalizeClassWeek = async (req, res) => {
   try {
     const {
-      className,
       academicYear,
       weekNumber,
     } = req.body;
 
+    // ================================================
+    // KIỂM TRA DỮ LIỆU
+    // ================================================
+
     if (
-      !className ||
       !academicYear ||
       !weekNumber
     ) {
       return res.status(400).json({
         message:
-          'Thiếu className, academicYear hoặc weekNumber',
+          'Thiếu academicYear hoặc weekNumber',
       });
     }
 
     const week = Number(weekNumber);
 
-    if (!Number.isInteger(week) || week < 1) {
+    if (
+      !Number.isInteger(week) ||
+      week < 1
+    ) {
       return res.status(400).json({
         message:
           'weekNumber không hợp lệ',
       });
     }
 
-    /**
-     * ================================================
-     * LẤY CÁC BẢN GHI CỦA LỚP + TUẦN
-     * ================================================
-     */
+    // ================================================
+    // LẤY TOÀN BỘ HỌC SINH CỦA TUẦN
+    // ================================================
+
     const scores =
       await StudentConductScore.find({
-        className,
         academicYear,
         weekNumber: week,
       });
 
-    /**
-     * Nếu chưa có dữ liệu thì không cho chốt.
-     *
-     * Tránh trường hợp BGH bấm nhầm
-     * nhưng database không có học sinh nào.
-     */
+    // ================================================
+    // KHÔNG CÓ DỮ LIỆU
+    // ================================================
+
     if (!scores.length) {
       return res.status(404).json({
         message:
-          `Chưa có dữ liệu hạnh kiểm tuần ${week} của lớp ${className}`,
+          `Chưa có dữ liệu hạnh kiểm tuần ${week} của toàn trường`,
       });
     }
 
-    /**
-     * ================================================
-     * KIỂM TRA ĐÃ CHỐT CHƯA
-     * ================================================
-     */
+    // ================================================
+    // ĐẾM BẢN GHI ĐÃ FINAL
+    // ================================================
+
     const finalCount =
       scores.filter(
         (score) =>
           score.status === 'FINAL'
       ).length;
 
-    /**
-     * Nếu toàn bộ đã FINAL
-     * thì báo đã chốt.
-     */
+    // ================================================
+    // NẾU TẤT CẢ ĐÃ FINAL
+    // ================================================
+
     if (
       finalCount ===
       scores.length
     ) {
       return res.json({
         message:
-          `Hạnh kiểm tuần ${week} lớp ${className} đã được chốt trước đó`,
-        className,
+          `Hạnh kiểm tuần ${week} toàn trường đã được duyệt trước đó`,
+
         academicYear,
+
         weekNumber: week,
-        existing: scores.length,
-        finalized: finalCount,
+
+        existing:
+          scores.length,
+
+        alreadyFinal:
+          finalCount,
+
         modified: 0,
-        alreadyFinal: true,
+
+        totalFinal:
+          finalCount,
+
+        alreadyFinalAll: true,
       });
     }
 
-    /**
-     * ================================================
-     * CHỐT TOÀN BỘ
-     * ================================================
-     */
+    // ================================================
+    // DUYỆT TOÀN BỘ TUẦN
+    // ================================================
+
     const result =
       await StudentConductScore.updateMany(
         {
-          className,
           academicYear,
           weekNumber: week,
           status: {
@@ -527,11 +532,13 @@ exports.finalizeClassWeek = async (req, res) => {
       result.nModified ??
       0;
 
+    // ================================================
+    // TRẢ KẾT QUẢ
+    // ================================================
+
     res.json({
       message:
-        `Đã chốt hạnh kiểm tuần ${week} lớp ${className}`,
-
-      className,
+        `Đã duyệt hạnh kiểm tuần ${week} toàn trường`,
 
       academicYear,
 
@@ -547,7 +554,10 @@ exports.finalizeClassWeek = async (req, res) => {
 
       totalFinal:
         finalCount + modified,
+
+      alreadyFinalAll: false,
     });
+
   } catch (err) {
     console.error(
       'finalizeClassWeek error:',
