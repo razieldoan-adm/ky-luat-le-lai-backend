@@ -442,9 +442,15 @@ exports.finalizeClassWeek = async (req, res) => {
     // LẤY TOÀN BỘ HỌC SINH TOÀN TRƯỜNG
     // ==========================================
 
-    const students = await Student.find({})
-      .select('name className')
-      .lean();
+const students = await Student.find({
+  name: {
+    $exists: true,
+    $type: "string",
+    $ne: "",
+  },
+})
+  .select("name className")
+  .lean();
     console.log(
   '🔎 STUDENT SAMPLE:',
   students.slice(0, 5)
