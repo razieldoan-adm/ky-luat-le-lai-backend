@@ -445,7 +445,10 @@ exports.finalizeClassWeek = async (req, res) => {
     const students = await Student.find({})
       .select('name className')
       .lean();
-
+    console.log(
+  '🔎 STUDENT SAMPLE:',
+  students.slice(0, 5)
+);
     if (!students.length) {
       return res.status(404).json({
         message: 'Không có học sinh trong hệ thống',
