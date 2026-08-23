@@ -392,8 +392,24 @@ exports.finalizeScore = async (req, res) => {
     });
   }
 };
+/**
+* =====================================================
+ * DUYỆT TOÀN BỘ HỌC SINH TOÀN TRƯỜNG CỦA 1 TUẦN
+ * =====================================================
+  */
+ const normalizeName = (name) => {
+  return String(name || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+};
 
-
+const normalizeClass = (className) => {
+  return String(className || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .toUpperCase();
+};
 /**
  * =====================================================
  * DUYỆT TOÀN BỘ HỌC SINH TOÀN TRƯỜNG CỦA 1 TUẦN
