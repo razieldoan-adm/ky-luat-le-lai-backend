@@ -265,50 +265,91 @@ if (violations.length > 0) {
     }
   );
 
-  // ==========================================================
-  // ⭐ UPSERT DUY NHẤT 1 BẢN GHI
-  // ==========================================================
 
-  const score =
-    await StudentConductScore.findOneAndUpdate(
-      {
+// ==========================================================
+// ⭐TÌM RECORD HẠNH KIỂM HIỆN TẠI UPSERT DUY NHẤT 1 BẢN GHI
+// ==========================================================
+
+const existingScore =
+  await StudentConductScore.findOne({
+    name,
+    className: classNormalized,
+    academicYear: String(
+      academicYear
+    ).trim(),
+    weekNumber: week,
+  });
+
+// ==========================================================
+// XÁC ĐỊNH TRẠNG THÁI
+// ==========================================================
+//
+// - Chưa có record  → DRAFT
+// - Đã có FINAL     → chuyển về DRAFT vì dữ liệu đã thay đổi
+// - Đang DRAFT      → giữ DRAFT
+// ==========================================================
+
+const newStatus = "DRAFT";
+
+// ==========================================================
+// UPSERT DUY NHẤT 1 BẢN GHI
+// ==========================================================
+
+const score =
+  await StudentConductScore.findOneAndUpdate(
+    {
+      name,
+      className: classNormalized,
+      academicYear:
+        String(academicYear).trim(),
+      weekNumber: week,
+    },
+    {
+      $set: {
         name,
         className: classNormalized,
-        academicYear: String(
-          academicYear
-        ).trim(),
+        academicYear:
+          String(academicYear).trim(),
         weekNumber: week,
+
+        maxScore,
+
+        groupViolations,
+
+        totalConductViolations,
+
+        totalDeduction,
+
+        finalScore,
+
+        hasSeriousViolation,
+
+        // Có thay đổi → phải duyệt lại
+        status: newStatus,
       },
-      {
-        $set: {
-          name,
-          className: classNormalized,
-          academicYear:
-            String(academicYear).trim(),
-          weekNumber: week,
+    },
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+      setDefaultsOnInsert: true,
+    }
+  );
 
-          maxScore,
+console.log(
+  "📌 TRẠNG THÁI TRƯỚC KHI CẬP NHẬT:",
+  existingScore?.status || "CHƯA CÓ"
+);
 
-          groupViolations,
+console.log(
+  "📌 TRẠNG THÁI SAU KHI CẬP NHẬT:",
+  score.status
+);
 
-          totalConductViolations,
-
-          totalDeduction,
-
-          finalScore,
-
-          hasSeriousViolation,
-
-          status: "DRAFT",
-        },
-      },
-      {
-        new: true,
-        upsert: true,
-        runValidators: true,
-        setDefaultsOnInsert: true,
-      }
-    );
+console.log(
+  "✅ ĐÃ CẬP NHẬT STUDENT CONDUCT SCORE:",
+  score
+);
 
   console.log(
     "✅ ĐÃ CẬP NHẬT STUDENT CONDUCT SCORE:",
@@ -321,6 +362,7 @@ if (violations.length > 0) {
 
   return score;
 };
+
  // ============================================================
 // XÓA BẢN GHI HK NẾU HS KHÔNG CÒN VI PHẠM TRONG TUẦN
 // ============================================================
