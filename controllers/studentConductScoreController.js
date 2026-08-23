@@ -421,20 +421,23 @@ exports.finalizeClassWeek = async (req, res) => {
     } = req.body;
 
     // ==========================================
-    // KIỂM TRA
+    // KIỂM TRA DỮ LIỆU
     // ==========================================
 
-    if (!academicYear || !weekNumber) {
+    if (!academicYear || weekNumber === undefined || weekNumber === null) {
       return res.status(400).json({
-        message: 'Thiếu academicYear hoặc weekNumber',
+        message: "Thiếu academicYear hoặc weekNumber",
       });
     }
+
+    const normalizedAcademicYear =
+      String(academicYear).trim();
 
     const week = Number(weekNumber);
 
     if (!Number.isInteger(week) || week < 1) {
       return res.status(400).json({
-        message: 'weekNumber không hợp lệ',
+        message: "weekNumber không hợp lệ",
       });
     }
 
@@ -442,98 +445,183 @@ exports.finalizeClassWeek = async (req, res) => {
     // LẤY TOÀN BỘ HỌC SINH TOÀN TRƯỜNG
     // ==========================================
 
-const students = await Student.find({
-  name: {
-    $exists: true,
-    $type: "string",
-    $ne: "",
-  },
-})
-  .select("name className")
-  .lean();
+    const students = await Student.find({
+      name: {
+        $exists: true,
+        $type: "string",
+        $ne: "",
+      },
+    })
+      .select("name className")
+      .lean();
+
     console.log(
-  '🔎 STUDENT SAMPLE:',
-  students.slice(0, 5)
-);
+      "🔎 STUDENT SAMPLE:",
+      students.slice(0, 5)
+    );
+
     if (!students.length) {
       return res.status(404).json({
-        message: 'Không có học sinh trong hệ thống',
+        message: "Không có học sinh trong hệ thống",
       });
     }
 
     // ==========================================
-    // XỬ LÝ TỪNG HỌC SINH
+    // BIẾN THỐNG KÊ
     // ==========================================
 
     let created = 0;
     let finalized = 0;
     let alreadyFinal = 0;
 
+    // ==========================================
+    // DUYỆT TỪNG HỌC SINH
+    // ==========================================
+
     for (const student of students) {
+
+      // ------------------------------------------
+      // CHUẨN HÓA TÊN + LỚP
+      // GIỐNG updateStudentConductScore()
+      // ------------------------------------------
+
+      const normalizedName =
+        normalizeName(student.name);
+
+      const normalizedClassName =
+        normalizeClass(student.className);
+
+      // ------------------------------------------
+      // TÌM RECORD HẠNH KIỂM HIỆN CÓ
+      // ------------------------------------------
 
       const existing =
         await StudentConductScore.findOne({
-          name: student.name,
-          className: student.className,
-          academicYear,
+          name: normalizedName,
+          className: normalizedClassName,
+          academicYear: normalizedAcademicYear,
           weekNumber: week,
         });
 
-      // ------------------------------------------
+      // ==========================================
       // ĐÃ CÓ RECORD
-      // ------------------------------------------
+      // ==========================================
 
       if (existing) {
 
-        if (existing.status === 'FINAL') {
-          alreadyFinal++;
-        } else {
-          existing.status = 'FINAL';
-          await existing.save();
+        console.log(
+          "🔎 TÌM THẤY RECORD:",
+          {
+            name: normalizedName,
+            className: normalizedClassName,
+            weekNumber: week,
+            status: existing.status,
+            totalConductViolations:
+              existing.totalConductViolations,
+            finalScore:
+              existing.finalScore,
+          }
+        );
 
-          finalized++;
+        // ----------------------------------------
+        // ĐÃ FINAL
+        // Không làm gì nữa
+        // ----------------------------------------
+
+        if (existing.status === "FINAL") {
+          alreadyFinal++;
+          continue;
         }
+
+        // ----------------------------------------
+        // DRAFT → FINAL
+        //
+        // QUAN TRỌNG:
+        // Không thay đổi:
+        // - groupViolations
+        // - totalConductViolations
+        // - totalDeduction
+        // - finalScore
+        // - hasSeriousViolation
+        //
+        // Chỉ chốt trạng thái.
+        // ----------------------------------------
+
+        existing.status = "FINAL";
+
+        await existing.save();
+
+        finalized++;
+
+        console.log(
+          "✅ ĐÃ CHỐT:",
+          {
+            name: existing.name,
+            className: existing.className,
+            weekNumber: existing.weekNumber,
+            totalConductViolations:
+              existing.totalConductViolations,
+            finalScore:
+              existing.finalScore,
+            status: existing.status,
+          }
+        );
 
         continue;
       }
 
-      // ------------------------------------------
+      // ==========================================
       // CHƯA CÓ RECORD
-      // → TẠO RECORD FINAL
-      // ------------------------------------------
+      //
+      // Tạo record mặc định:
+      // 0 lỗi - 100 điểm - FINAL
+      // ==========================================
 
-      await StudentConductScore.create({
-        name: student.name,
-        className: student.className,
+      const newScore =
+        await StudentConductScore.create({
+          name: normalizedName,
+          className: normalizedClassName,
 
-        academicYear,
-        weekNumber: week,
+          academicYear:
+            normalizedAcademicYear,
 
-        groupViolations: {
-          N1: 0,
-          N2: 0,
-          N3: 0,
-          N4: 0,
-          N5: 0,
-          S1: 0,
-        },
+          weekNumber: week,
 
-        totalConductViolations: 0,
-        totalDeduction: 0,
+          groupViolations: {
+            N1: 0,
+            N2: 0,
+            N3: 0,
+            N4: 0,
+            N5: 0,
+            S1: 0,
+          },
 
-        maxScore: 100,
-        finalScore: 100,
+          totalConductViolations: 0,
+          totalDeduction: 0,
 
-        hasSeriousViolation: false,
+          maxScore: 100,
+          finalScore: 100,
 
-        status: 'FINAL',
-      });
+          hasSeriousViolation: false,
+
+          status: "FINAL",
+        });
 
       created++;
+
+      console.log(
+        "🆕 TẠO RECORD FINAL:",
+        {
+          name: newScore.name,
+          className: newScore.className,
+          weekNumber: newScore.weekNumber,
+          status: newScore.status,
+        }
+      );
     }
 
     // ==========================================
-    // KẾT QUẢ
+    // TỔNG KẾT
     // ==========================================
 
     const totalFinal =
@@ -541,14 +629,43 @@ const students = await Student.find({
       finalized +
       alreadyFinal;
 
+    console.log(
+      "==============================================="
+    );
+
+    console.log(
+      "✅ HOÀN TẤT DUYỆT HẠNH KIỂM TOÀN TRƯỜNG",
+      {
+        academicYear:
+          normalizedAcademicYear,
+
+        weekNumber: week,
+
+        totalStudents:
+          students.length,
+
+        created,
+        finalized,
+        alreadyFinal,
+        totalFinal,
+      }
+    );
+
+    console.log(
+      "==============================================="
+    );
+
     return res.json({
       message:
         `Đã duyệt hạnh kiểm tuần ${week} toàn trường`,
 
-      academicYear,
+      academicYear:
+        normalizedAcademicYear,
+
       weekNumber: week,
 
-      totalStudents: students.length,
+      totalStudents:
+        students.length,
 
       created,
       finalized,
@@ -558,14 +675,18 @@ const students = await Student.find({
     });
 
   } catch (err) {
+
     console.error(
-      '❌ finalizeClassWeek error:',
+      "❌ finalizeClassWeek error:",
       err
     );
 
     return res.status(500).json({
-      message: 'Lỗi duyệt hạnh kiểm toàn trường',
-      error: err.message,
+      message:
+        "Lỗi duyệt hạnh kiểm toàn trường",
+
+      error:
+        err.message,
     });
   }
 };
