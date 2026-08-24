@@ -1427,7 +1427,25 @@ exports.updateViolation = async (
           "Không tìm thấy vi phạm.",
       });
     }
+    // ========================================================
+// 📝 LƯU DỮ LIỆU TRƯỚC KHI SỬA
+// ========================================================
 
+const beforeData = {
+  name: violation.name,
+  className: violation.className,
+  academicYear: violation.academicYear,
+  weekNumber: violation.weekNumber,
+  description: violation.description,
+  ruleCode: violation.ruleCode,
+  groupCode: violation.groupCode,
+  penalty: violation.penalty,
+  handlingMethod: violation.handlingMethod,
+  handled: violation.handled,
+  handledBy: violation.handledBy,
+  handlingNote: violation.handlingNote,
+  time: violation.time,
+};
     // ========================================================
     // LƯU THÔNG TIN CŨ
     // ========================================================
@@ -1514,7 +1532,49 @@ exports.updateViolation = async (
     }
 
     await violation.save();
-
+    // ========================================================
+    // 📝 LƯU DỮ LIỆU SAU KHI SỬA
+    // ========================================================
+    
+    const afterData = {
+      name: violation.name,
+      className: violation.className,
+      academicYear: violation.academicYear,
+      weekNumber: violation.weekNumber,
+      description: violation.description,
+      ruleCode: violation.ruleCode,
+      groupCode: violation.groupCode,
+      penalty: violation.penalty,
+      handlingMethod: violation.handlingMethod,
+      handled: violation.handled,
+      handledBy: violation.handledBy,
+      handlingNote: violation.handlingNote,
+      time: violation.time,
+    };
+    // ========================================================
+    // 📝 GHI LỊCH SỬ THAY ĐỔI
+    // ========================================================
+      await createAuditLog({
+      req,
+    
+      action: "UPDATE",
+    
+      module: "VIOLATION",
+    
+      targetId: violation._id,
+    
+      studentName: violation.name,
+    
+      className: violation.className,
+    
+      academicYear: violation.academicYear,
+    
+      weekNumber: violation.weekNumber,
+    
+      beforeData,
+    
+      afterData,
+    });
     // ========================================================
     // ⭐ TÍNH LẠI BẢN GHI CŨ
     //
