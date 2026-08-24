@@ -12,7 +12,7 @@ router.post('/', verifyToken, controller.createViolation);
 router.patch('/:id/handle', controller.handleViolation); // ✅ Cập nhật chuẩn xử lý
 
 // ❌ Xóa & thống kê
-router.delete('/:id', controller.deleteViolation);
+router.delete('/:id', verifyToken, controller.deleteViolation);
 router.get('/count', controller.getViolationCount);
 router.get('/unhandled/count', controller.getUnhandledViolationCount);
 router.get('/students/multiple-violations/count', controller.countMultipleViolations);
