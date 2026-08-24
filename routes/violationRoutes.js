@@ -19,7 +19,7 @@ router.get('/students/multiple-violations/count', controller.countMultipleViolat
 
 
 
-router.put('/:id', controller.updateViolation);
+router.put('/:id', verifyToken, controller.updateViolation);
 
 router.get("/gvcn-limit", controller.getGVCNHandlingLimit);
 router.post("/gvcn-limit", controller.toggleGVCNHandlingLimit);
