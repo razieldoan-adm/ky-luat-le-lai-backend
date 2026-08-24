@@ -756,6 +756,26 @@ exports.handleViolation = async (
       });
     }
 
+    // ==========================================================
+    // 📝 LƯU DỮ LIỆU TRƯỚC KHI XÓA
+    // ==========================================================
+    
+    const beforeData = {
+      name: violation.name,
+      className: violation.className,
+      academicYear: violation.academicYear,
+      weekNumber: violation.weekNumber,
+      description: violation.description,
+      ruleCode: violation.ruleCode,
+      groupCode: violation.groupCode,
+      penalty: violation.penalty,
+      handlingMethod: violation.handlingMethod,
+      handled: violation.handled,
+      handledBy: violation.handledBy,
+      handlingNote: violation.handlingNote,
+      time: violation.time,
+    };
+    
     const weekNumber =
       violation.weekNumber;
 
@@ -976,7 +996,31 @@ exports.deleteViolation = async (req, res) => {
           "Không thể xóa vi phạm",
       });
     }
-
+    // ==========================================================
+    // 📝 GHI LỊCH SỬ XÓA
+    // ==========================================================
+    
+    await createAuditLog({
+      req,
+    
+      action: "DELETE",
+    
+      module: "VIOLATION",
+    
+      targetId: id,
+    
+      studentName: name,
+    
+      className: className,
+    
+      academicYear: academicYear,
+    
+      weekNumber: weekNumber,
+    
+      beforeData,
+    
+      afterData: null,
+    });
     console.log(
       "✅ ĐÃ XÓA VI PHẠM:",
       {
