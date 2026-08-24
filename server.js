@@ -23,6 +23,8 @@ const earlyLeaveStudentRoutes = require("./routes/earlyLeaveStudent.routes");
 const studentConductScoreRoutes = require('./routes/studentConductScoreRoutes');
 const studentMonthlyConductRoutes = require("./routes/studentMonthlyConductRoutes");
 
+const auditLogRoutes = require("./routes/auditLogRoutes");
+
 const studentAnnualConductRoutes =
   require("./routes/studentAnnualConductRoutes");
 
@@ -70,6 +72,8 @@ app.use("/api/early-leave/students", earlyLeaveStudentRoutes);
 app.use('/api/student-conduct-scores', studentConductScoreRoutes);
 app.use("/api/student-monthly-conduct", studentMonthlyConductRoutes);
 app.use("/api/student-annual-conduct", studentAnnualConductRoutes);
+
+app.use("/api/audit-logs",auditLogRoutes);
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
