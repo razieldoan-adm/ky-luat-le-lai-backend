@@ -467,38 +467,79 @@ exports.searchViolations = async (req, res) => {
 // 📌 LẤY VI PHẠM THEO HỌC SINH
 // ============================================================
 
+// ============================================================
+// 📌 LẤY VI PHẠM THEO HỌC SINH + TUẦN
+// ============================================================
+
 exports.getViolationsByStudent = async (
   req,
   res
 ) => {
-  const { className } = req.query;
+  const {
+    className,
+    weekNumber,
+    academicYear,
+  } = req.query;
 
   const name = normalizeName(
     req.params.name
   );
 
   try {
-    const violations = await Violation.find({
+    // ========================================================
+    // KIỂM TRA THÔNG TIN BẮT BUỘC
+    // ========================================================
+
+    if (
+      !className ||
+      weekNumber === undefined ||
+      weekNumber === null
+    ) {
+      return res.status(400).json({
+        error:
+          "Thiếu className hoặc weekNumber.",
+      });
+    }
+
+    // ========================================================
+    // LỌC THEO HỌC SINH + LỚP + TUẦN
+    // ========================================================
+
+    const query = {
       name,
       className,
-    }).collation({
-      locale: 'en',
-      strength: 2,
-    });
+      weekNumber: Number(weekNumber),
+    };
+
+    // Nếu frontend gửi academicYear thì lọc thêm
+    if (academicYear) {
+      query.academicYear =
+        String(academicYear).trim();
+    }
+
+    const violations =
+      await Violation.find(query)
+        .collation({
+          locale: "en",
+          strength: 2,
+        })
+        .sort({
+          time: 1,
+        });
 
     res.json(violations);
+
   } catch (err) {
     console.error(
-      'getViolationsByStudent error:',
+      "getViolationsByStudent error:",
       err
     );
 
     res.status(500).json({
-      error: 'Server error',
+      error: "Server error",
     });
   }
 };
-
 // ============================================================
 // ➕ GHI NHẬN VI PHẠM
 // ============================================================
