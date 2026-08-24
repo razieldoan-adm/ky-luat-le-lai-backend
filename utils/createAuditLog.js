@@ -14,7 +14,7 @@ const createAuditLog = async ({
 }) => {
   try {
     const user = req.user || {};
-
+    console.log("🔐 AUDIT req.user:", req.user);
     const auditLog = await AuditLog.create({
       userId:
         user.id ||
