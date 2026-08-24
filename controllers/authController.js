@@ -15,11 +15,15 @@ exports.loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ message: 'Sai mật khẩu.' });
     }
-    const token = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+   const token = jwt.sign(
+    {
+      userId: user._id,
+      username: user.username,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '1d' }
+  );
 
     res.json({ token, role: user.role });
   } catch (error) {
