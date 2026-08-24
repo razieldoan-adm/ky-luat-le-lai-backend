@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/violationController');
-
+const {verifyToken} = require('../middlewares/authMiddleware');
 // 🔎 Tìm kiếm & lấy danh sách
 router.get('/search', controller.searchViolations);
 router.get('/unhandled/students', controller.getUnhandledViolationStudents);
 router.get('/all/all-student', controller.getAllViolationStudents);
 
 // ➕ Ghi nhận & xử lý
-router.post('/', controller.createViolation);
+router.post('/', verifyToken, controller.createViolation);
 router.patch('/:id/handle', controller.handleViolation); // ✅ Cập nhật chuẩn xử lý
 
 // ❌ Xóa & thống kê
