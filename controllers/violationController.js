@@ -931,7 +931,25 @@ exports.deleteViolation = async (req, res) => {
         message: "Không tìm thấy vi phạm",
       });
     }
-
+    // ==========================================================
+    // 📝 LƯU DỮ LIỆU TRƯỚC KHI XÓA
+    // ==========================================================
+    
+    const beforeData = {
+      name: violation.name,
+      className: violation.className,
+      academicYear: violation.academicYear,
+      weekNumber: violation.weekNumber,
+      description: violation.description,
+      ruleCode: violation.ruleCode,
+      groupCode: violation.groupCode,
+      penalty: violation.penalty,
+      handlingMethod: violation.handlingMethod,
+      handled: violation.handled,
+      handledBy: violation.handledBy,
+      handlingNote: violation.handlingNote,
+      time: violation.time,
+    };
     const name = violation.name;
     const className = violation.className;
     const academicYear =
