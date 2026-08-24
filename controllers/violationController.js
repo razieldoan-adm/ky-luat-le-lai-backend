@@ -2,6 +2,7 @@ const Violation = require('../models/Violation');
 const Rule = require('../models/Rule');
 const Setting = require('../models/Setting');
 const StudentConductScore = require('../models/StudentConductScore');
+const createAuditLog = require("../utils/createAuditLog");
 
 // ============================================================
 // HELPER
@@ -627,7 +628,32 @@ exports.createViolation = async (req, res) => {
       });
 
     await violation.save();
-
+    // ========================================================
+    // 📝 GHI LỊCH SỬ THÊM VI PHẠM
+    // ========================================================
+    
+    await createAuditLog({
+      req,
+    
+      action: "CREATE",
+    
+      module: "VIOLATION",
+    
+      targetId: violation._id,
+    
+      studentName: violation.name,
+    
+      className: violation.className,
+    
+      academicYear: violation.academicYear,
+    
+      weekNumber: violation.weekNumber,
+    
+      beforeData: null,
+    
+      afterData: violation.toObject(),
+    });
+    
     // ========================================================
     // ⭐ TÍNH LẠI HẠNH KIỂM
     // ========================================================
