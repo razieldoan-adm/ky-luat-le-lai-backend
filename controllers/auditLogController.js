@@ -6,12 +6,35 @@ const AuditLog = require("../models/AuditLog");
 
 exports.getViolationAuditLogs = async (req, res) => {
   try {
-    const logs = await AuditLog.find({
+    const { weekNumber, className } = req.query;
+
+    const filter = {
       module: "VIOLATION",
       action: {
         $in: ["CREATE", "UPDATE", "DELETE"],
       },
-    })
+
+      ...(weekNumber !== undefined &&
+        weekNumber !== ""
+        ? {
+            weekNumber: Number(weekNumber),
+          }
+        : {}),
+
+      ...(className !== undefined &&
+        className !== ""
+        ? {
+            className: className,
+          }
+        : {}),
+    };
+
+    console.log(
+      "🔎 AUDIT LOG FILTER:",
+      filter
+    );
+
+    const logs = await AuditLog.find(filter)
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();
@@ -20,6 +43,7 @@ exports.getViolationAuditLogs = async (req, res) => {
       logs,
       count: logs.length,
     });
+
   } catch (error) {
     console.error(
       "❌ LỖI LẤY AUDIT LOG:",
