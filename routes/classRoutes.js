@@ -7,6 +7,6 @@ router.get('/', classController.getAllClasses);
 router.get('/with-teacher', classController.getClassesWithTeacher);
 router.get('/discipline-summary', classController.getClassDisciplineSummary);
 router.get('/count', classController.getClassCount);
-router.delete('/:className', deleteClass);
+router.delete('/:className', classController.deleteClass);
 
 module.exports = router;
