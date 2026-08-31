@@ -273,13 +273,13 @@ exports.updateWeeksBulk = async (req, res) => {
           : null,
       };
     });
-
+    console.log("UPDATED WEEKS:", JSON.stringify(req.body, null, 2));
     await AcademicWeek.deleteMany({});
 
     const savedWeeks = await AcademicWeek.insertMany(
       weeksToInsert
     );
-
+    
     res.json({
       message: 'Đã lưu danh sách tuần mới',
       weeks: savedWeeks,
