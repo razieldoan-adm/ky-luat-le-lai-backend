@@ -1,4 +1,5 @@
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
+const AcademicWeek = require("../models/AcademicWeek");
 const XLSX = require("xlsx");
 
 /**
@@ -259,6 +260,42 @@ exports.getAcademicYearsWithScores = async (req, res) => {
   } catch (err) {
     console.error(
       "❌ Error in getAcademicYearsWithScores:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
+
+// =========================================================
+// LẤY TUẦN HỌC THEO NĂM HỌC
+// TUẦN LẤY TỪ SETTINGS / ACADEMIC WEEK
+// KHÔNG LẤY TỪ CLASS WEEKLY SCORE
+// =========================================================
+exports.getStudyWeeksByAcademicYear = async (req, res) => {
+  try {
+    const { academicYear } = req.query;
+
+    if (!academicYear) {
+      return res.status(400).json({
+        message: "Thiếu academicYear",
+      });
+    }
+
+    const weeks = await AcademicWeek.find({
+      academicYear,
+      isStudyWeek: true,
+      weekNumber: { $ne: null },
+    })
+      .sort({ startDate: 1 })
+      .lean();
+
+    res.json(weeks);
+  } catch (err) {
+    console.error(
+      "❌ Error in getStudyWeeksByAcademicYear:",
       err
     );
 
