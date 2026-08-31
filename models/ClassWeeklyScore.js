@@ -34,6 +34,7 @@ const classWeeklyScoreSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Đảm bảo mỗi lớp chỉ có 1 bản ghi/tuần
-classWeeklyScoreSchema.index({ className: 1, weekNumber: 1 }, { unique: true });
+classWeeklyScoreSchema.index({ className: 1, academicYear: 1, weekNumber: 1 },
+  { unique: true });
 
 module.exports = mongoose.model('ClassWeeklyScore', classWeeklyScoreSchema);
