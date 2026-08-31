@@ -7,10 +7,10 @@ const XLSX = require("xlsx");
  */
 exports.getWeeklyScores = async (req, res) => {
   try {
-    const { weekNumber } = req.query;
-    if (!weekNumber) return res.status(400).json({ message: "Thiếu weekNumber" });
+    const { academicYear, weekNumber } = req.query;
+    if (!academicYear || !weekNumber) return res.status(400).json({ message: "Thiếu weekNumber" });
 
-    const scores = await ClassWeeklyScore.find({ weekNumber }).lean();
+    const scores = await ClassWeeklyScore.find({ academicYear, weekNumber }).lean();
     res.json(scores);
   } catch (err) {
     console.error("Error in getWeeklyScores:", err);
@@ -28,6 +28,7 @@ exports.updateWeeklyScores = async (req, res) => {
     const {
       className,
       grade,
+      academicYear,
       weekNumber,
       hygieneScore,
       lineupScore,
@@ -38,7 +39,7 @@ exports.updateWeeklyScores = async (req, res) => {
     console.log("📩 BODY nhận được từ frontend:", req.body);
 
     // ✅ Kiểm tra className và weekNumber
-    if (!className || !weekNumber) {
+    if (!className || !academicYear || !weekNumber) {
       return res.status(400).json({ message: "Thiếu className hoặc weekNumber" });
     }
 
@@ -55,9 +56,9 @@ exports.updateWeeklyScores = async (req, res) => {
     }
 
     // ✅ Tìm hoặc tạo mới bản ghi theo className + weekNumber
-    let weekly = await ClassWeeklyScore.findOne({ className, weekNumber });
+    let weekly = await ClassWeeklyScore.findOne({ className, academicYear, weekNumber });
     if (!weekly) {
-      weekly = new ClassWeeklyScore({ className, grade: finalGrade, weekNumber });
+      weekly = new ClassWeeklyScore({ className, grade: finalGrade, academicYear, weekNumber });
     } else {
       weekly.grade = finalGrade; // cập nhật luôn cho chắc
     }
@@ -84,7 +85,13 @@ exports.updateWeeklyScores = async (req, res) => {
  */
 exports.getWeeksWithScores = async (req, res) => {
   try {
-    const weeks = await ClassWeeklyScore.distinct("weekNumber");
+    const { academicYear } = req.query;
+    if (!academicYear) {
+      return res.status(400).json({
+      message: "Thiếu academicYear"
+      });
+    }
+    const weeks = await ClassWeeklyScore.distinct("weekNumber", { academicYear });
     res.json(weeks.sort((a, b) => a - b));
   } catch (err) {
     console.error("Error in getWeeksWithScores:", err);
@@ -99,9 +106,10 @@ exports.getWeeksWithScores = async (req, res) => {
 exports.deleteWeeklyScores = async (req, res) => {
   try {
     const { weekNumber } = req.params;
-    if (!weekNumber) return res.status(400).json({ message: "Thiếu weekNumber" });
+    const { academicYear } = req.query;
+    if (!academicYear || !weekNumber) return res.status(400).json({ message: "Thiếu academicYear hoặc weekNumber" });
 
-    await ClassWeeklyScore.deleteMany({ weekNumber });
+    await ClassWeeklyScore.deleteMany({ academicYear, weekNumber });
     res.json({ message: `Đã xóa dữ liệu tuần ${weekNumber}` });
   } catch (err) {
     console.error("Error in deleteWeeklyScores:", err);
@@ -116,9 +124,11 @@ exports.deleteWeeklyScores = async (req, res) => {
 exports.exportWeeklyScores = async (req, res) => {
   try {
     const { weekNumber } = req.params;
-    if (!weekNumber) return res.status(400).json({ message: "Thiếu weekNumber" });
+    const { academicYear } = req.query;
 
-    const scores = await ClassWeeklyScore.find({ weekNumber }).lean();
+    if (!academicYear || !weekNumber) return res.status(400).json({ message: "Thiếu academicYear hoặc weekNumber" });
+
+    const scores = await ClassWeeklyScore.find({ academicYear, weekNumber }).lean();
     const worksheet = XLSX.utils.json_to_sheet(scores);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Scores");
@@ -148,6 +158,7 @@ exports.saveManualWeeklyScores = async (req, res) => {
       const {
         className,
         grade,
+        academicYear,
         weekNumber,
         academicScore = 0,
         bonusScore = 0,        // ✅ đúng với schema
@@ -160,15 +171,16 @@ exports.saveManualWeeklyScores = async (req, res) => {
         rank = 0,              // ✅ đúng với schema
       } = rec;
 
-      if (!className || !grade || !weekNumber) continue;
+      if (!className || !grade || !academicYear || !weekNumber) continue;
 
       // ✅ Ghi đúng field name trong schema
       const updated = await ClassWeeklyScore.findOneAndUpdate(
-        { className, grade, weekNumber },
+        { className, grade, academicYear, weekNumber },
         {
           $set: {
             className,
             grade,
+            academicYear,
             weekNumber,
             academicScore: Number(academicScore) || 0,
             bonusScore: Number(bonusScore) || 0,
@@ -206,12 +218,12 @@ exports.saveManualWeeklyScores = async (req, res) => {
 exports.getFullWeeklyScores = async (req, res) => {
   try {
     const { weekNumber } = req.params;
-
-    if (!weekNumber) {
+    const { academicYear } = req.query;
+    if (!academicYear || !weekNumber) {
       return res.status(400).json({ message: "Thiếu tham số weekNumber" });
     }
 
-    const scores = await ClassWeeklyScore.find({ weekNumber })
+    const scores = await ClassWeeklyScore.find({ academicYear, weekNumber })
       .sort({ grade: 1, ranking: 1 })
       .lean();
 
