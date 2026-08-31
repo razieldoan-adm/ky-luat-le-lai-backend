@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const classWeeklyScoreSchema = new mongoose.Schema({
   className: { type: String, required: true },
   grade: { type: String, required: true},
+  academicYear: { type: String, required: true },
   weekNumber: { type: Number, required: true },
 
   // Điểm học tập
