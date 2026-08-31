@@ -39,7 +39,6 @@ const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
  */
 exports.generateWeeks = async (req, res) => {
   try {
-    const { startDate, endDate } = req.body;
     const { startDate, endDate, academicYear } = req.body;
     // -------------------------------------------------------
     // KIỂM TRA INPUT
