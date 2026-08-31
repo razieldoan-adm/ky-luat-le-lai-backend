@@ -47,6 +47,40 @@ exports.getClassesWithTeacher = async (req, res) => {
   }
 };
 
+// Xóa một lớp
+exports.deleteClass = async (req, res) => {
+  try {
+    const className = req.params.className?.toUpperCase()?.trim();
+
+    if (!className) {
+      return res.status(400).json({
+        error: 'Thiếu tên lớp',
+      });
+    }
+
+    const deleted = await Class.findOneAndDelete({
+      className,
+    });
+
+    if (!deleted) {
+      return res.status(404).json({
+        error: 'Không tìm thấy lớp cần xóa',
+      });
+    }
+
+    res.json({
+      message: `Đã xóa lớp ${className}`,
+      data: deleted,
+    });
+  } catch (err) {
+    console.error('Lỗi khi xóa lớp:', err);
+
+    res.status(500).json({
+      error: 'Lỗi server khi xóa lớp',
+    });
+  }
+};
+
 // ham tinh diem ky luat real time
 
 
