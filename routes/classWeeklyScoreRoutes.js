@@ -23,6 +23,11 @@ router.get(
   controller.getAcademicYearsWithScores
 );
 
+router.get(
+  "/study-weeks",
+  controller.getStudyWeeksByAcademicYear
+);
+
 // 🔹 Xuất Excel dữ liệu điểm của tuần
 // GET /api/weekly-scores/export/:weekNumber
 router.get("/export/:weekNumber", controller.exportWeeklyScores);
