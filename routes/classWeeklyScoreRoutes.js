@@ -18,8 +18,14 @@ router.get("/weeks", controller.getWeeksWithScores);
 // DELETE /api/weekly-scores/:weekNumber
 router.delete("/:weekNumber", controller.deleteWeeklyScores);
 
+router.get(
+  "/academic-years",
+  controller.getAcademicYearsWithScores
+);
+
 // 🔹 Xuất Excel dữ liệu điểm của tuần
 // GET /api/weekly-scores/export/:weekNumber
 router.get("/export/:weekNumber", controller.exportWeeklyScores);
 router.get("/full/:weekNumber", controller.getFullWeeklyScores);
 module.exports = router;
+
