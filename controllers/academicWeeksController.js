@@ -231,7 +231,7 @@ exports.updateWeeksBulk = async (req, res) => {
     const updatedWeeks = Array.isArray(req.body)
       ? req.body
       : [];
-
+      console.log("UPDATED WEEKS:", JSON.stringify(req.body, null, 2));
     if (!updatedWeeks.length) {
       return res.status(400).json({
         message: 'Danh sách tuần không hợp lệ',
@@ -273,7 +273,7 @@ exports.updateWeeksBulk = async (req, res) => {
           : null,
       };
     });
-    console.log("UPDATED WEEKS:", JSON.stringify(req.body, null, 2));
+    
     await AcademicWeek.deleteMany({});
 
     const savedWeeks = await AcademicWeek.insertMany(
