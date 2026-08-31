@@ -238,31 +238,34 @@ exports.updateWeeksBulk = async (req, res) => {
       });
     }
 
-    // -------------------------------------------------------
-    // Sắp xếp theo ngày bắt đầu
-    // -------------------------------------------------------
+    // Lấy năm học từ tuần đầu tiên
+    const academicYear = updatedWeeks[0]?.academicYear;
 
+    if (!academicYear) {
+      return res.status(400).json({
+        message: 'Thiếu năm học',
+      });
+    }
+
+    // Sắp xếp theo ngày bắt đầu
     const sortedWeeks = [...updatedWeeks].sort(
       (a, b) =>
         new Date(a.startDate).getTime() -
         new Date(b.startDate).getTime()
     );
 
-    // -------------------------------------------------------
-    // ĐÁNH SỐ TUẦN HỌC
-    // -------------------------------------------------------
-
     let weekNumberCounter = 1;
 
     const weeksToInsert = sortedWeeks.map((week) => {
-      const isStudyWeek =
-        Boolean(week.isStudyWeek);
+      const isStudyWeek = Boolean(week.isStudyWeek);
 
       return {
         startDate: week.startDate,
         endDate: week.endDate,
-        academicYear: week.academicYear,
-        
+
+        // QUAN TRỌNG
+        academicYear,
+
         isStudyWeek,
 
         weekNumber: isStudyWeek
@@ -271,30 +274,19 @@ exports.updateWeeksBulk = async (req, res) => {
       };
     });
 
-    // -------------------------------------------------------
-    // XÓA DỮ LIỆU CŨ
-    // -------------------------------------------------------
-
     await AcademicWeek.deleteMany({});
 
-    // -------------------------------------------------------
-    // LƯU DỮ LIỆU MỚI
-    // -------------------------------------------------------
-
-    const savedWeeks =
-      await AcademicWeek.insertMany(
-        weeksToInsert
-      );
+    const savedWeeks = await AcademicWeek.insertMany(
+      weeksToInsert
+    );
 
     res.json({
       message: 'Đã lưu danh sách tuần mới',
       weeks: savedWeeks,
     });
+
   } catch (err) {
-    console.error(
-      'Lỗi updateWeeksBulk:',
-      err
-    );
+    console.error('Lỗi updateWeeksBulk:', err);
 
     res.status(500).json({
       message: 'Lỗi server khi lưu danh sách tuần',
