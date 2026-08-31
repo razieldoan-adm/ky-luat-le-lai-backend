@@ -244,3 +244,26 @@ exports.getFullWeeklyScores = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+// =========================================================
+// LẤY CÁC NĂM HỌC ĐÃ CÓ DỮ LIỆU
+// =========================================================
+exports.getAcademicYearsWithScores = async (req, res) => {
+  try {
+    const years = await ClassWeeklyScore.distinct("academicYear");
+
+    const result = years
+      .filter(Boolean)
+      .sort((a, b) => b.localeCompare(a));
+
+    res.json(result);
+  } catch (err) {
+    console.error(
+      "❌ Error in getAcademicYearsWithScores:",
+      err
+    );
+
+    res.status(500).json({
+      message: "Server error",
+    });
+  }
+};
