@@ -40,7 +40,7 @@ const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
 exports.generateWeeks = async (req, res) => {
   try {
     const { startDate, endDate } = req.body;
-
+    const { startDate, endDate, academicYear } = req.body;
     // -------------------------------------------------------
     // KIỂM TRA INPUT
     // -------------------------------------------------------
@@ -56,7 +56,11 @@ exports.generateWeeks = async (req, res) => {
         message: 'Vui lòng chọn ngày kết thúc năm học',
       });
     }
-
+    if (!academicYear) {
+      return res.status(400).json({
+        message: 'Vui lòng chọn năm học',
+      });
+    }
     const start = dayjs
       .tz(startDate, VN_TIMEZONE)
       .startOf('day');
@@ -147,6 +151,7 @@ exports.generateWeeks = async (req, res) => {
       weeks.push({
         startDate: currentStart.toDate(),
         endDate: currentEnd.toDate(),
+        academicYear,
 
         // Ban đầu chưa chọn tuần học
         weekNumber: null,
@@ -257,7 +262,8 @@ exports.updateWeeksBulk = async (req, res) => {
       return {
         startDate: week.startDate,
         endDate: week.endDate,
-
+        academicYear: week.academicYear,
+        
         isStudyWeek,
 
         weekNumber: isStudyWeek
