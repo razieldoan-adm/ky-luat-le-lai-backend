@@ -353,40 +353,56 @@ exports.getStudyWeeks = async (req, res) => {
  */
 exports.getCurrentStudyWeek = async (req, res) => {
   try {
-    const todayVN = dayjs()
-      .tz(VN_TIMEZONE);
+    const todayVN = dayjs().tz(VN_TIMEZONE);
+
     console.log("===== CHECK CURRENT WEEK =====");
     console.log("Today VN:", todayVN.format());
     console.log("Today Date:", todayVN.toDate());
-    const currentWeek =
-      await AcademicWeek.findOne({
-        startDate: {
-          $lte: todayVN.toDate(),
-        },
 
-        endDate: {
-          $gte: todayVN.toDate(),
-        },
+    // 🔎 Lấy tất cả tuần học để kiểm tra
+    const allStudyWeeks = await AcademicWeek.find({
+      isStudyWeek: true,
+    })
+      .sort({ weekNumber: 1 })
+      .lean();
 
-        isStudyWeek: true,
-      }).lean();
+    console.log(
+      "ALL STUDY WEEKS:",
+      allStudyWeeks.map((w) => ({
+        weekNumber: w.weekNumber,
+        startDate: w.startDate,
+        endDate: w.endDate,
+        academicYear: w.academicYear,
+        isStudyWeek: w.isStudyWeek,
+      }))
+    );
+
+    // 🔎 Tìm tuần hiện tại
+    const currentWeek = await AcademicWeek.findOne({
+      startDate: {
+        $lte: todayVN.toDate(),
+      },
+      endDate: {
+        $gte: todayVN.toDate(),
+      },
+      isStudyWeek: true,
+    }).lean();
+
+    console.log("CURRENT WEEK FOUND:", currentWeek);
 
     if (!currentWeek) {
       return res.status(404).json({
-        message:
-          'Không tìm thấy tuần học hiện tại',
+        message: "Không tìm thấy tuần học hiện tại",
       });
     }
 
     res.json(currentWeek);
+
   } catch (err) {
-    console.error(
-      'Lỗi getCurrentStudyWeek:',
-      err
-    );
+    console.error("Lỗi getCurrentStudyWeek:", err);
 
     res.status(500).json({
-      error: 'Server error',
+      error: "Server error",
     });
   }
 };
