@@ -355,7 +355,9 @@ exports.getCurrentStudyWeek = async (req, res) => {
   try {
     const todayVN = dayjs()
       .tz(VN_TIMEZONE);
-
+    console.log("===== CHECK CURRENT WEEK =====");
+    console.log("Today VN:", todayVN.format());
+    console.log("Today Date:", todayVN.toDate());
     const currentWeek =
       await AcademicWeek.findOne({
         startDate: {
