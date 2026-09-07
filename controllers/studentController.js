@@ -31,7 +31,7 @@ exports.importExcel = async (req, res) => {
 
     for (const r of rows) {
       // Lấy tên linh hoạt (Họ tên hoặc Tên)
-      const name = (r['Họ tên'] || r['Tên'] || '').trim();
+      const name = (r['Tên học sinh'] || r['Họ tên'] || r['Tên'] || '').toString().trim();
       const className = (r['Lớp'] || '').trim();
 
       // Bỏ qua dòng trống
