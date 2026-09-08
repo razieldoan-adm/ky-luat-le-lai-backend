@@ -3,6 +3,7 @@ const express = require("express");
 const {
   getGoogleAuthUrl,
   getTokensFromCode,
+  createViolationFolder,
 } = require("../utils/googleDrive");
 
 const router = express.Router();
@@ -120,5 +121,30 @@ GOOGLE_REFRESH_TOKEN
     }
   }
 );
+router.get("/test-folder", async (req, res) => {
+  try {
+    const folder = await createViolationFolder();
 
+    console.log("✅ GOOGLE DRIVE TẠO FOLDER THÀNH CÔNG");
+    console.log("Folder ID:", folder.id);
+    console.log("Folder Name:", folder.name);
+
+    res.json({
+      success: true,
+      message: "Tạo thư mục Google Drive thành công",
+      folder,
+    });
+  } catch (error) {
+    console.error(
+      "❌ GOOGLE DRIVE TEST ERROR:",
+      error.response?.data || error.message
+    );
+
+    res.status(500).json({
+      success: false,
+      message: "Không thể tạo thư mục Google Drive",
+      error: error.response?.data || error.message,
+    });
+  }
+});
 module.exports = router;
