@@ -22,7 +22,8 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.15.1",
     "multer": "^2.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "googleapis": "^166.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
