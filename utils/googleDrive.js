@@ -62,6 +62,23 @@ const setRefreshToken = (refreshToken) => {
 };
 
 // ============================================================
+// TEST
+// ============================================================
+const createViolationFolder = async () => {
+  const drive = getDrive();
+
+  const folder = await drive.files.create({
+    requestBody: {
+      name: "KyLuatLeLai-AnhViPham",
+      mimeType: "application/vnd.google-apps.folder",
+    },
+    fields: "id, name",
+  });
+
+  return folder.data;
+};
+
+// ============================================================
 // EXPORT
 // ============================================================
 
@@ -71,4 +88,5 @@ module.exports = {
   getGoogleAuthUrl,
   getTokensFromCode,
   setRefreshToken,
+  createViolationFolder,
 };
