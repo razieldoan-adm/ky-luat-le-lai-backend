@@ -16,9 +16,9 @@ const violationSchema = new mongoose.Schema(
       required: true,
     },
       academicYear: {
-  type: String,
-  required: true,
-  trim: true,
+      type: String,
+      required: true,
+      trim: true,
     },
     // ==========================================
     // NHÓM LỖI - CBB1
@@ -134,11 +134,29 @@ const violationSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
-  },
-  {
-    timestamps: true,
-  }
-);
+      },
+      // ==========================================
+      // HÌNH ẢNH VI PHẠM
+      // Lưu thông tin tham chiếu Google Drive
+      // Không lưu file ảnh trực tiếp trong MongoDB
+      // ==========================================
+
+      images: [
+        {
+          fileId: {
+            type: String,
+            default: '',
+          },
+          url: {
+            type: String,
+            default: '',
+          },
+        },
+      ],
+      {
+        timestamps: true,
+      }
+    );
 
 // ==========================================
 // INDEX
