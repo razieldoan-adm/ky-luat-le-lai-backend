@@ -4,6 +4,13 @@ const Setting = require('../models/Setting');
 const StudentConductScore = require('../models/StudentConductScore');
 const createAuditLog = require("../utils/createAuditLog");
 
+const {
+  getDrive,
+  getOrCreateViolationFolder,
+} = require("../utils/googleDrive");
+
+const { Readable } = require("stream");
+
 // ============================================================
 // HELPER
 // ============================================================
@@ -1746,3 +1753,355 @@ exports.toggleGVCNHandlingLimit =
       });
     }
   };
+
+// ============================================================
+// 📷 THÊM HÌNH ẢNH CHO VI PHẠM
+//
+// QUAN TRỌNG:
+// - Không tạo Violation mới
+// - Không tính lại điểm
+// - Không thay đổi dữ liệu vi phạm
+// ============================================================
+
+exports.addViolationImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // --------------------------------------------------------
+    // TÌM VIOLATION
+    // --------------------------------------------------------
+
+    const violation =
+      await Violation.findById(id);
+
+    if (!violation) {
+      return res.status(404).json({
+        error: "Không tìm thấy vi phạm.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // KIỂM TRA FILE
+    // --------------------------------------------------------
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        error: "Chưa chọn hình ảnh.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // GIỚI HẠN TỔNG SỐ ẢNH
+    // --------------------------------------------------------
+
+    const currentImages =
+      violation.images || [];
+
+    if (
+      currentImages.length +
+        req.files.length >
+      20
+    ) {
+      return res.status(400).json({
+        error:
+          "Mỗi vi phạm chỉ được lưu tối đa 20 hình ảnh.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // GOOGLE DRIVE
+    // --------------------------------------------------------
+
+    const drive = getDrive();
+
+    const folder =
+      await getOrCreateViolationFolder();
+
+    const uploadedImages = [];
+
+    // --------------------------------------------------------
+    // UPLOAD TỪNG FILE
+    // --------------------------------------------------------
+
+    for (const file of req.files) {
+      const driveFile =
+        await drive.files.create({
+          requestBody: {
+            name: `${Date.now()}-${file.originalname}`,
+            mimeType: file.mimetype,
+            parents: [folder.id],
+          },
+
+          media: {
+            mimeType: file.mimetype,
+            body: Readable.from(
+              file.buffer
+            ),
+          },
+
+          fields:
+            "id,name,mimeType",
+        });
+
+      const fileId =
+        driveFile.data.id;
+
+      uploadedImages.push({
+        fileId,
+
+        // URL NỘI BỘ BACKEND
+        // Không phải URL public của Google Drive
+        url:
+          `/api/violations/${id}/images/${fileId}`,
+      });
+    }
+
+    // --------------------------------------------------------
+    // LƯU METADATA VÀO MONGODB
+    // --------------------------------------------------------
+
+    violation.images.push(
+      ...uploadedImages
+    );
+
+    await violation.save();
+
+    // --------------------------------------------------------
+    // TRẢ KẾT QUẢ
+    // --------------------------------------------------------
+
+    return res.json({
+      success: true,
+
+      message:
+        "Đã thêm hình ảnh cho vi phạm.",
+
+      images:
+        violation.images,
+    });
+
+  } catch (error) {
+    console.error(
+      "❌ addViolationImages:",
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        "Lỗi khi upload hình ảnh.",
+      detail:
+        error.message,
+    });
+  }
+};
+
+// ============================================================
+// 👁️ XEM ẢNH VI PHẠM
+//
+// Ảnh Google Drive vẫn PRIVATE.
+// Backend lấy ảnh rồi stream về frontend.
+// ============================================================
+
+exports.getViolationImage = async (
+  req,
+  res
+) => {
+  try {
+    const {
+      id,
+      fileId,
+    } = req.params;
+
+    // --------------------------------------------------------
+    // TÌM VIOLATION
+    // --------------------------------------------------------
+
+    const violation =
+      await Violation.findById(id);
+
+    if (!violation) {
+      return res.status(404).json({
+        error:
+          "Không tìm thấy vi phạm.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // KIỂM TRA FILE CÓ THUỘC VIOLATION NÀY KHÔNG
+    // --------------------------------------------------------
+
+    const image =
+      (violation.images || []).find(
+        (item) =>
+          item.fileId === fileId
+      );
+
+    if (!image) {
+      return res.status(404).json({
+        error:
+          "Hình ảnh không thuộc vi phạm này.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // GOOGLE DRIVE
+    // --------------------------------------------------------
+
+    const drive = getDrive();
+
+    // Lấy metadata
+    const metadata =
+      await drive.files.get({
+        fileId,
+
+        fields:
+          "id,name,mimeType",
+      });
+
+    const mimeType =
+      metadata.data.mimeType ||
+      "image/jpeg";
+
+    // --------------------------------------------------------
+    // LẤY FILE PRIVATE
+    // --------------------------------------------------------
+
+    const response =
+      await drive.files.get(
+        {
+          fileId,
+          alt: "media",
+        },
+        {
+          responseType: "stream",
+        }
+      );
+
+    // --------------------------------------------------------
+    // TRẢ ẢNH VỀ FRONTEND
+    // --------------------------------------------------------
+
+    res.setHeader(
+      "Content-Type",
+      mimeType
+    );
+
+    res.setHeader(
+      "Cache-Control",
+      "private, max-age=3600"
+    );
+
+    response.data.pipe(res);
+
+  } catch (error) {
+    console.error(
+      "❌ getViolationImage:",
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        "Không thể tải hình ảnh.",
+      detail:
+        error.message,
+    });
+  }
+};
+
+// ============================================================
+// 🗑️ XÓA HÌNH ẢNH
+//
+// Không xóa Violation.
+// Không thay đổi điểm.
+// ============================================================
+
+exports.deleteViolationImage = async (
+  req,
+  res
+) => {
+  try {
+    const {
+      id,
+      fileId,
+    } = req.params;
+
+    // --------------------------------------------------------
+    // TÌM VIOLATION
+    // --------------------------------------------------------
+
+    const violation =
+      await Violation.findById(id);
+
+    if (!violation) {
+      return res.status(404).json({
+        error:
+          "Không tìm thấy vi phạm.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // KIỂM TRA ẢNH
+    // --------------------------------------------------------
+
+    const imageIndex =
+      (violation.images || []).findIndex(
+        (item) =>
+          item.fileId === fileId
+      );
+
+    if (imageIndex === -1) {
+      return res.status(404).json({
+        error:
+          "Không tìm thấy hình ảnh.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // XÓA FILE TRÊN GOOGLE DRIVE
+    // --------------------------------------------------------
+
+    const drive = getDrive();
+
+    await drive.files.delete({
+      fileId,
+    });
+
+    // --------------------------------------------------------
+    // XÓA METADATA TRONG MONGODB
+    // --------------------------------------------------------
+
+    violation.images.splice(
+      imageIndex,
+      1
+    );
+
+    await violation.save();
+
+    // --------------------------------------------------------
+    // TRẢ KẾT QUẢ
+    // --------------------------------------------------------
+
+    return res.json({
+      success: true,
+
+      message:
+        "Đã xóa hình ảnh.",
+
+      images:
+        violation.images,
+    });
+
+  } catch (error) {
+    console.error(
+      "❌ deleteViolationImage:",
+      error
+    );
+
+    return res.status(500).json({
+      error:
+        "Lỗi khi xóa hình ảnh.",
+      detail:
+        error.message,
+    });
+  }
+};
