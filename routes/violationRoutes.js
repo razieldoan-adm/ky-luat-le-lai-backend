@@ -24,6 +24,30 @@ router.put('/:id', verifyToken, controller.updateViolation);
 router.get("/gvcn-limit", controller.getGVCNHandlingLimit);
 router.post("/gvcn-limit", controller.toggleGVCNHandlingLimit);
 
+
+
+// ============================================================
+// VIOLATION IMAGES
+// ============================================================
+
+router.post(
+  "/:id/images",
+  verifyToken,
+  upload.array("images", 5),
+  controller.addViolationImages
+);
+
+router.get(
+  "/:id/images/:fileId",
+  verifyToken,
+  controller.getViolationImage
+);
+
+router.delete(
+  "/:id/images/:fileId",
+  verifyToken,
+  controller.deleteViolationImage
+);
 // 📌 Lấy vi phạm theo học sinh
 router.get('/:name', controller.getViolationsByStudent);
 
