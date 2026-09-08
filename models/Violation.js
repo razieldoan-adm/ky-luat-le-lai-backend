@@ -134,7 +134,7 @@ const violationSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
-      },
+     
       // ==========================================
       // HÌNH ẢNH VI PHẠM
       // Lưu thông tin tham chiếu Google Drive
@@ -153,6 +153,7 @@ const violationSchema = new mongoose.Schema(
           },
         },
       ],
+   },
       {
         timestamps: true,
       }
