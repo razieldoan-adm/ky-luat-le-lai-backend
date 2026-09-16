@@ -123,7 +123,7 @@ GOOGLE_REFRESH_TOKEN
 );
 router.get("/test-folder", async (req, res) => {
   try {
-    const folder = await createViolationFolder();
+    const folder = await getOrCreateViolationFolder();
 
     console.log("✅ GOOGLE DRIVE TẠO FOLDER THÀNH CÔNG");
     console.log("Folder ID:", folder.id);
