@@ -23,7 +23,8 @@
     "mongoose": "^8.15.1",
     "multer": "^2.0.1",
     "xlsx": "^0.18.5",
-    "googleapis": "^166.0.0"
+    "googleapis": "^166.0.0",
+    "sharp": "^0.34.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
