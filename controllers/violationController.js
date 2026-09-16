@@ -3,6 +3,7 @@ const Rule = require('../models/Rule');
 const Setting = require('../models/Setting');
 const StudentConductScore = require('../models/StudentConductScore');
 const createAuditLog = require("../utils/createAuditLog");
+const sharp = require("sharp");
 
 const {
   getDrive,
@@ -1823,38 +1824,47 @@ exports.addViolationImages = async (req, res) => {
     // UPLOAD TỪNG FILE
     // --------------------------------------------------------
 
-    for (const file of req.files) {
-      const driveFile =
-        await drive.files.create({
-          requestBody: {
-            name: `${Date.now()}-${file.originalname}`,
-            mimeType: file.mimetype,
-            parents: [folder.id],
-          },
+for (const file of req.files) {
+  // Tự động xoay ảnh theo EXIF + resize + nén
+  const compressedBuffer = await sharp(file.buffer)
+    .rotate()
+    .resize({
+      width: 1600,
+      height: 1600,
+      fit: "inside",
+      withoutEnlargement: true,
+    })
+    .jpeg({
+      quality: 80,
+      mozjpeg: true,
+    })
+    .toBuffer();
 
-          media: {
-            mimeType: file.mimetype,
-            body: Readable.from(
-              file.buffer
-            ),
-          },
+  const driveFile = await drive.files.create({
+    requestBody: {
+      name: `${Date.now()}-${file.originalname.replace(/\.[^/.]+$/, "")}.jpg`,
+      mimeType: "image/jpeg",
+      parents: [folder.id],
+    },
 
-          fields:
-            "id,name,mimeType",
-        });
+    media: {
+      mimeType: "image/jpeg",
+      body: Readable.from(compressedBuffer),
+    },
 
-      const fileId =
-        driveFile.data.id;
+    fields: "id,name,mimeType",
+  });
 
-      uploadedImages.push({
-        fileId,
+  const fileId = driveFile.data.id;
 
-        // URL NỘI BỘ BACKEND
-        // Không phải URL public của Google Drive
-        url:
-          `/api/violations/${id}/images/${fileId}`,
-      });
-    }
+  uploadedImages.push({
+    fileId,
+
+    // URL NỘI BỘ BACKEND
+    // Không phải URL public của Google Drive
+    url: `/api/violations/${id}/images/${fileId}`,
+  });
+}
 
     // --------------------------------------------------------
     // LƯU METADATA VÀO MONGODB
