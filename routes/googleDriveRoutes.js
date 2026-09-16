@@ -3,7 +3,7 @@ const express = require("express");
 const {
   getGoogleAuthUrl,
   getTokensFromCode,
-  createViolationFolder,
+  getOrCreateViolationFolder,
 } = require("../utils/googleDrive");
 
 const router = express.Router();
