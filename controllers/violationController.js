@@ -1826,6 +1826,12 @@ exports.addViolationImages = async (req, res) => {
 
 for (const file of req.files) {
   // Tự động xoay ảnh theo EXIF + resize + nén
+  console.log(
+  '📷 IMAGE:',
+  file.originalname,
+  file.mimetype,
+  file.buffer?.length
+);
   const compressedBuffer = await sharp(file.buffer)
     .rotate()
     .resize({
