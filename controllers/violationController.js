@@ -1832,7 +1832,16 @@ for (const file of req.files) {
   file.mimetype,
   file.buffer?.length
 );
-  const compressedBuffer = await sharp(file.buffer)
+  let compressedBuffer;
+
+try {
+  console.log("📷 Bắt đầu nén:", {
+    name: file.originalname,
+    type: file.mimetype,
+    size: file.buffer?.length,
+  });
+
+  compressedBuffer = await sharp(file.buffer)
     .rotate()
     .resize({
       width: 1600,
@@ -1845,6 +1854,17 @@ for (const file of req.files) {
       mozjpeg: true,
     })
     .toBuffer();
+
+  console.log("✅ Nén thành công:", {
+    name: file.originalname,
+    originalSize: file.buffer.length,
+    compressedSize: compressedBuffer.length,
+  });
+} catch (sharpError) {
+  console.error("❌ SHARP ERROR:", sharpError);
+
+  throw sharpError;
+}
 
   const driveFile = await drive.files.create({
     requestBody: {
