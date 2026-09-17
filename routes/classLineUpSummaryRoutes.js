@@ -20,4 +20,8 @@ router.get("/total", controller.getClassLineUpTotal);
 // 🔹 Cập nhật hoặc tạo mới điểm xếp hàng theo lớp trong tuần (thủ công)
 router.post("/update-weekly-score", controller.updateWeeklyLineUpScore);
 
+router.post("/:id/images", upload.array("images", 10), controller.uploadImages);
+
+router.delete("/:id/images/:fileId", controller.deleteImage);
+
 module.exports = router;
