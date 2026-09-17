@@ -9,6 +9,13 @@ const classLineUpSummarySchema = new mongoose.Schema({
   weekNumber: { type: Number, default: null }, // ✅ thêm trường này
   scoreChange: { type: Number, default: 10 }, // ✅ mỗi lỗi +10 điểm
   note: { type: String, default: "" }, // 🆕 Ghi chú (tùy chọn)
+
+  images: [
+  {
+    fileId: { type: String },
+    url: { type: String },
+  },
+],
 });
 
 module.exports = mongoose.model("ClassLineUpSummary", classLineUpSummarySchema);
