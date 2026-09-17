@@ -4,7 +4,10 @@ const AcademicWeek = require("../models/AcademicWeek");
 const ClassWeeklyScore = require('../models/ClassWeeklyScore');
 const sharp = require("sharp");
 const { Readable } = require("stream");
-const { getDrive } = require("../utils/googleDrive");
+const {
+  getDrive,
+  getOrCreateViolationFolder,
+} = require("../utils/googleDrive");
 
 // Helper: lấy điểm mặc định (thử nhiều tên trường trong Setting, fallback = 10)
 function getDefaultPenalty(setting) {
@@ -179,6 +182,8 @@ exports.updateWeeklyLineUpScore = async (req, res) => {
   }
 };
 
+
+
 // ============================================================
 // 📷 UPLOAD HÌNH ẢNH CHO LỖI XẾP HÀNG
 // ============================================================
@@ -191,44 +196,38 @@ exports.uploadImages = async (req, res) => {
 
     if (!record) {
       return res.status(404).json({
+        success: false,
         message: "Không tìm thấy bản ghi vi phạm xếp hàng",
       });
     }
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
+        success: false,
         message: "Không có hình ảnh được tải lên",
       });
     }
 
-    const drive = await getDrive();
+    // 📁 Lấy hoặc tạo thư mục Google Drive
+    const folder = await getOrCreateViolationFolder();
 
-    // Tìm thư mục Google Drive hiện tại của hệ thống
-    const folderName = "KyLuatLeLai-AnhViPham";
-
-    const folderResponse = await drive.files.list({
-      q: [
-        `name = '${folderName}'`,
-        "mimeType = 'application/vnd.google-apps.folder'",
-        "trashed = false",
-      ].join(" and "),
-      fields: "files(id,name)",
-      spaces: "drive",
-    });
-
-    const folder = folderResponse.data.files?.[0];
-
-    if (!folder) {
+    if (!folder || !folder.id) {
       return res.status(500).json({
-        message: "Không tìm thấy thư mục Google Drive lưu hình ảnh",
+        success: false,
+        message: "Không thể xác định thư mục Google Drive",
       });
     }
+
+    const drive = getDrive();
 
     const uploadedImages = [];
 
     for (const file of req.files) {
       try {
-        // 🔹 Nén ảnh bằng Sharp
+        // ======================================================
+        // 🔹 NÉN + XOAY ẢNH
+        // ======================================================
+
         const compressedBuffer = await sharp(file.buffer)
           .rotate()
           .resize({
@@ -243,11 +242,19 @@ exports.uploadImages = async (req, res) => {
           })
           .toBuffer();
 
-        // 🔹 Tên file
-        const fileName = `${Date.now()}-${file.originalname
-          .replace(/[^\w.\- ]/g, "_")}`;
+        // ======================================================
+        // 🔹 TÊN FILE
+        // ======================================================
 
-        // 🔹 Upload lên Google Drive
+        const originalName = file.originalname
+          .replace(/[^\w.\- ]/g, "_");
+
+        const fileName = `XepHang-${Date.now()}-${originalName}.jpg`;
+
+        // ======================================================
+        // 🔹 UPLOAD GOOGLE DRIVE
+        // ======================================================
+
         const uploaded = await drive.files.create({
           requestBody: {
             name: fileName,
@@ -266,26 +273,34 @@ exports.uploadImages = async (req, res) => {
           continue;
         }
 
-        // 🔹 Lưu URL nội bộ
+        // ======================================================
+        // 🔹 LƯU THÔNG TIN ẢNH
+        // ======================================================
+
         uploadedImages.push({
           fileId,
           url: `/api/class-lineup-summaries/${id}/images/${fileId}`,
         });
-      } catch (imageErr) {
+
+      } catch (imageError) {
         console.error(
-          "❌ Lỗi xử lý/upload một hình ảnh:",
-          imageErr
+          "❌ Lỗi xử lý/upload ảnh:",
+          imageError
         );
       }
     }
 
     if (uploadedImages.length === 0) {
       return res.status(500).json({
+        success: false,
         message: "Không thể upload hình ảnh",
       });
     }
 
-    // 🔹 Thêm ảnh vào record hiện tại
+    // ==========================================================
+    // 🔹 CẬP NHẬT MẢNG IMAGES
+    // ==========================================================
+
     record.images = [
       ...(record.images || []),
       ...uploadedImages,
@@ -293,15 +308,18 @@ exports.uploadImages = async (req, res) => {
 
     await record.save();
 
-    return res.json({
+    return res.status(200).json({
+      success: true,
       message: "✅ Upload hình ảnh thành công",
       images: record.images,
       record,
     });
+
   } catch (err) {
     console.error("❌ uploadImages error:", err);
 
     return res.status(500).json({
+      success: false,
       message: "Không thể upload hình ảnh",
       error: err.message,
     });
@@ -321,6 +339,7 @@ exports.deleteImage = async (req, res) => {
 
     if (!record) {
       return res.status(404).json({
+        success: false,
         message: "Không tìm thấy bản ghi",
       });
     }
@@ -331,25 +350,38 @@ exports.deleteImage = async (req, res) => {
 
     if (!imageExists) {
       return res.status(404).json({
-        message: "Không tìm thấy hình ảnh",
+        success: false,
+        message: "Hình ảnh không thuộc bản ghi này",
       });
     }
 
-    // Xóa file trên Google Drive
-    const drive = await getDrive();
+    // ==========================================================
+    // 🔹 XÓA FILE GOOGLE DRIVE
+    // ==========================================================
+
+    const drive = getDrive();
 
     try {
       await drive.files.delete({
         fileId,
       });
-    } catch (driveErr) {
+
+      console.log(
+        "✅ Đã xóa ảnh Google Drive:",
+        fileId
+      );
+
+    } catch (driveError) {
       console.warn(
-        "⚠️ Không xóa được file Google Drive:",
-        driveErr.message
+        "⚠️ Không thể xóa ảnh trên Google Drive:",
+        driveError.message
       );
     }
 
-    // Xóa reference trong MongoDB
+    // ==========================================================
+    // 🔹 XÓA KHỎI MONGODB
+    // ==========================================================
+
     record.images = (record.images || []).filter(
       (image) => image.fileId !== fileId
     );
@@ -357,13 +389,16 @@ exports.deleteImage = async (req, res) => {
     await record.save();
 
     return res.json({
+      success: true,
       message: "✅ Đã xóa hình ảnh",
       images: record.images,
     });
+
   } catch (err) {
     console.error("❌ deleteImage error:", err);
 
     return res.status(500).json({
+      success: false,
       message: "Không thể xóa hình ảnh",
       error: err.message,
     });
@@ -383,9 +418,14 @@ exports.getImage = async (req, res) => {
 
     if (!record) {
       return res.status(404).json({
+        success: false,
         message: "Không tìm thấy bản ghi",
       });
     }
+
+    // ==========================================================
+    // 🔹 KIỂM TRA ẢNH CÓ THUỘC RECORD KHÔNG
+    // ==========================================================
 
     const imageExists = (record.images || []).some(
       (image) => image.fileId === fileId
@@ -393,11 +433,16 @@ exports.getImage = async (req, res) => {
 
     if (!imageExists) {
       return res.status(404).json({
+        success: false,
         message: "Hình ảnh không thuộc bản ghi này",
       });
     }
 
-    const drive = await getDrive();
+    // ==========================================================
+    // 🔹 LẤY ẢNH TỪ GOOGLE DRIVE
+    // ==========================================================
+
+    const drive = getDrive();
 
     const response = await drive.files.get(
       {
@@ -414,21 +459,28 @@ exports.getImage = async (req, res) => {
       response.headers["content-type"] || "image/jpeg"
     );
 
-    response.data.on("error", (err) => {
-      console.error("❌ Google Drive stream error:", err);
+    response.data.on("error", (streamError) => {
+      console.error(
+        "❌ Google Drive stream error:",
+        streamError
+      );
+
       if (!res.headersSent) {
         res.status(500).json({
+          success: false,
           message: "Không thể đọc hình ảnh",
         });
       }
     });
 
     response.data.pipe(res);
+
   } catch (err) {
     console.error("❌ getImage error:", err);
 
     if (!res.headersSent) {
       return res.status(500).json({
+        success: false,
         message: "Không thể lấy hình ảnh",
         error: err.message,
       });
