@@ -5,6 +5,14 @@ const settingSchema = new mongoose.Schema({
     type: Number,
     default: 100
   },
+  backgroundImagePC: {
+    type: String,
+    default: '',
+  },
+  backgroundImageMobile: {
+    type: String,
+    default: '',
+  },
   maxClassAcademicScoresByGrade: {
     type: Map,
     of: Number,
@@ -39,6 +47,7 @@ const settingSchema = new mongoose.Schema({
     ],
     default: [],
   },
+  
 });
 
 module.exports = mongoose.model('Setting', settingSchema);
