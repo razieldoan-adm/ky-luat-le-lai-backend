@@ -2,7 +2,7 @@ const Violation = require('../models/Violation');
 const Rule = require('../models/Rule');
 const Setting = require('../models/Setting');
 const StudentConductScore = require('../models/StudentConductScore');
-const LeaveApplication = require('../models/LeaveApplication');
+
 const createAuditLog = require("../utils/createAuditLog");
 const sharp = require("sharp");
 
@@ -190,47 +190,39 @@ if (violations.length > 0) {
   // ĐẾM TỪ VIOLATION
   // ==========================================================
 
-  for (const violation of violations) {
+for (const violation of violations) {
 
-    // Kiểm tra đơn xin phép của vi phạm này
-    const application = await LeaveApplication.findOne({
-      violationId: violation._id,
-    });
-    
-    // Chỉ khi đơn được DUYỆT thì vi phạm mới không bị trừ điểm
-    if (application && application.status === "APPROVED") {
-      continue;
-    }
-    // ==========================================
-    // PENDING / REJECTED / OVERDUE
-    // → TÍNH VI PHẠM BÌNH THƯỜNG
-    // ==========================================  
-    
-    const groupCode =
-      await getGroupCode(violation);
+  // ==========================================================
+  // HẠNH KIỂM:
+  // MỌI VI PHẠM ĐÃ GHI NHẬN ĐỀU BẮT BUỘC TÍNH
+  // Không phụ thuộc đơn xin phép hay trạng thái xử lý.
+  // ==========================================================
 
-    console.log(
-      "→ Violation:",
-      violation._id,
-      "|",
-      violation.description,
-      "| group:",
-      groupCode
-    );
+  const groupCode =
+    await getGroupCode(violation);
 
-    if (
-      [
-        "N1",
-        "N2",
-        "N3",
-        "N4",
-        "N5",
-        "S1",
-      ].includes(groupCode)
-    ) {
-      groupViolations[groupCode]++;
-    }
+  console.log(
+    "→ Violation:",
+    violation._id,
+    "|",
+    violation.description,
+    "| group:",
+    groupCode
+  );
+
+  if (
+    [
+      "N1",
+      "N2",
+      "N3",
+      "N4",
+      "N5",
+      "S1",
+    ].includes(groupCode)
+  ) {
+    groupViolations[groupCode]++;
   }
+}
 
   // ==========================================================
   // TỔNG LỖI TÍNH HẠNH KIỂM
