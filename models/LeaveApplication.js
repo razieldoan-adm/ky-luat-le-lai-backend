@@ -10,7 +10,6 @@ const leaveApplicationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Violation',
       required: true,
-      index: true,
     },
 
     // ==========================================
