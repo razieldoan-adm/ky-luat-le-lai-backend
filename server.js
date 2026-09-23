@@ -27,13 +27,14 @@ const googleDriveRoutes = require("./routes/googleDriveRoutes");
 
 const auditLogRoutes = require("./routes/auditLogRoutes");
 
-const studentAnnualConductRoutes =
-  require("./routes/studentAnnualConductRoutes");
+const studentAnnualConductRoutes = require("./routes/studentAnnualConductRoutes");
 
 const studentRoutes = require('./routes/studentRoutes');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+
+const leaveApplicationRoutes = require('./routes/leaveApplicationRoutes');
 
 dotenv.config();
 
@@ -77,6 +78,8 @@ app.use("/api/student-annual-conduct", studentAnnualConductRoutes);
 
 app.use("/api/google-drive",googleDriveRoutes);
 app.use("/api/audit-logs",auditLogRoutes);
+
+app.use("/api/leave-applications", leaveApplicationRoutes);
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
