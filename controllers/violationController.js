@@ -388,7 +388,7 @@ console.log(
 
   return score;
 };
-
+exports.updateStudentConductScore = updateStudentConductScore;
  // ============================================================
 // XÓA BẢN GHI HK NẾU HS KHÔNG CÒN VI PHẠM TRONG TUẦN
 // ============================================================
