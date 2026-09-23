@@ -1,10 +1,6 @@
 const LeaveApplication = require("../models/LeaveApplication");
 const Violation = require("../models/Violation");
 
-const {
-  updateStudentConductScore,
-} = require("./violationController");
-
 // ============================================================
 // 📋 LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
 // ============================================================
@@ -392,14 +388,6 @@ exports.approveApplication =
 
       await application.save();
 
-      // APPROVED → không tính vi phạm
-      const violation =
-        await Violation.findById(
-          application.violationId
-        );
-
-      
-
       res.json({
         success: true,
         message:
@@ -463,14 +451,6 @@ exports.rejectApplication =
 
       await application.save();
 
-      // REJECTED → vẫn tính vi phạm
-      const violation =
-        await Violation.findById(
-          application.violationId
-        );
-
-      
-
       res.json({
         success: true,
         message:
@@ -522,15 +502,6 @@ exports.markApplicationOverdue =
         new Date();
 
       await application.save();
-
-      // OVERDUE → tính lại điểm
-      // Violation gốc vẫn còn
-      const violation =
-        await Violation.findById(
-          application.violationId
-        );
-
-      
 
       res.json({
         success: true,
