@@ -398,14 +398,7 @@ exports.approveApplication =
           application.violationId
         );
 
-      if (violation) {
-        await updateStudentConductScore(
-          violation.name,
-          violation.className,
-          violation.academicYear,
-          violation.weekNumber
-        );
-      }
+      
 
       res.json({
         success: true,
@@ -476,14 +469,7 @@ exports.rejectApplication =
           application.violationId
         );
 
-      if (violation) {
-        await updateStudentConductScore(
-          violation.name,
-          violation.className,
-          violation.academicYear,
-          violation.weekNumber
-        );
-      }
+      
 
       res.json({
         success: true,
@@ -544,14 +530,7 @@ exports.markApplicationOverdue =
           application.violationId
         );
 
-      if (violation) {
-        await updateStudentConductScore(
-          violation.name,
-          violation.className,
-          violation.academicYear,
-          violation.weekNumber
-        );
-      }
+      
 
       res.json({
         success: true,
