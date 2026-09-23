@@ -1,16 +1,22 @@
 const LeaveApplication = require("../models/LeaveApplication");
 const Violation = require("../models/Violation");
-const StudentConductScore = require("../models/StudentConductScore");
+
 const {
   updateStudentConductScore,
 } = require("./violationController");
 
-// ======================================================
-// 1. LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
-// ======================================================
-const getEligibleViolations = async (req, res) => {
+// ============================================================
+// 📋 LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
+// ============================================================
+
+exports.getEligibleViolations = async (req, res) => {
   try {
-    const { name, className, academicYear, weekNumber } = req.query;
+    const {
+      name,
+      className,
+      academicYear,
+      weekNumber,
+    } = req.query;
 
     const filter = {};
 
@@ -30,35 +36,46 @@ const getEligibleViolations = async (req, res) => {
       filter.weekNumber = Number(weekNumber);
     }
 
-    const violations = await Violation.find(filter)
-      .sort({ time: -1 })
-      .lean();
+    const violations =
+      await Violation.find(filter)
+        .sort({ time: -1 })
+        .lean();
 
     // Lấy các vi phạm đã có đơn
-    const violationIds = violations.map((item) => item._id);
-
-    const applications = await LeaveApplication.find({
-      violationId: { $in: violationIds },
-    }).lean();
-
-    const applicationMap = new Map(
-      applications.map((item) => [
-        String(item.violationId),
-        item,
-      ])
-    );
-
-    // Gắn thông tin đơn vào từng vi phạm
-    const result = violations.map((violation) => {
-      const application = applicationMap.get(
-        String(violation._id)
+    const violationIds =
+      violations.map(
+        (item) => item._id
       );
 
-      return {
-        ...violation,
-        application: application || null,
-      };
-    });
+    const applications =
+      await LeaveApplication.find({
+        violationId: {
+          $in: violationIds,
+        },
+      }).lean();
+
+    const applicationMap =
+      new Map(
+        applications.map((item) => [
+          String(item.violationId),
+          item,
+        ])
+      );
+
+    // Gắn thông tin đơn vào từng vi phạm
+    const result =
+      violations.map((violation) => {
+        const application =
+          applicationMap.get(
+            String(violation._id)
+          );
+
+        return {
+          ...violation,
+          application:
+            application || null,
+        };
+      });
 
     res.json({
       success: true,
@@ -72,16 +89,21 @@ const getEligibleViolations = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Không thể lấy danh sách vi phạm",
+      message:
+        "Không thể lấy danh sách vi phạm",
       error: error.message,
     });
   }
 };
 
-// ======================================================
-// 2. TẠO ĐƠN XIN PHÉP
-// ======================================================
-const createApplication = async (req, res) => {
+// ============================================================
+// 📝 TẠO ĐƠN XIN PHÉP
+// ============================================================
+
+exports.createApplication = async (
+  req,
+  res
+) => {
   try {
     const {
       violationId,
@@ -97,21 +119,24 @@ const createApplication = async (req, res) => {
     }
 
     // Tìm vi phạm
-    const violation = await Violation.findById(
-      violationId
-    );
+    const violation =
+      await Violation.findById(
+        violationId
+      );
 
     if (!violation) {
       return res.status(404).json({
         success: false,
-        message: "Không tìm thấy vi phạm",
+        message:
+          "Không tìm thấy vi phạm",
       });
     }
 
     // Kiểm tra đã có đơn chưa
     const existingApplication =
       await LeaveApplication.findOne({
-        violationId: violation._id,
+        violationId:
+          violation._id,
       });
 
     if (existingApplication) {
@@ -119,39 +144,59 @@ const createApplication = async (req, res) => {
         success: false,
         message:
           "Vi phạm này đã có đơn xin phép",
-        application: existingApplication,
+        application:
+          existingApplication,
       });
     }
 
     const application =
       await LeaveApplication.create({
-        violationId: violation._id,
+        violationId:
+          violation._id,
 
-        studentName: violation.name,
-        className: violation.className,
-        academicYear: violation.academicYear,
-        weekNumber: violation.weekNumber,
+        studentName:
+          violation.name,
 
-        ruleCode: violation.ruleCode,
-        groupCode: violation.groupCode,
-        description: violation.description,
+        className:
+          violation.className,
 
-        originalPenalty: violation.penalty || 0,
+        academicYear:
+          violation.academicYear,
+
+        weekNumber:
+          violation.weekNumber,
+
+        ruleCode:
+          violation.ruleCode,
+
+        groupCode:
+          violation.groupCode,
+
+        description:
+          violation.description,
+
+        originalPenalty:
+          violation.penalty || 0,
 
         status: "PENDING",
 
-        submittedAt: new Date(),
+        submittedAt:
+          new Date(),
 
-        deadlineAt: deadlineAt
-          ? new Date(deadlineAt)
-          : null,
+        deadlineAt:
+          deadlineAt
+            ? new Date(
+                deadlineAt
+              )
+            : null,
 
         note: note || "",
       });
 
     res.status(201).json({
       success: true,
-      message: "Nộp đơn xin phép thành công",
+      message:
+        "Nộp đơn xin phép thành công",
       data: application,
     });
   } catch (error) {
@@ -162,16 +207,21 @@ const createApplication = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Không thể tạo đơn xin phép",
+      message:
+        "Không thể tạo đơn xin phép",
       error: error.message,
     });
   }
 };
 
-// ======================================================
-// 3. LẤY DANH SÁCH ĐƠN
-// ======================================================
-const getApplications = async (req, res) => {
+// ============================================================
+// 📋 LẤY DANH SÁCH ĐƠN
+// ============================================================
+
+exports.getApplications = async (
+  req,
+  res
+) => {
   try {
     const {
       status,
@@ -192,21 +242,28 @@ const getApplications = async (req, res) => {
     }
 
     if (academicYear) {
-      filter.academicYear = academicYear;
+      filter.academicYear =
+        academicYear;
     }
 
     if (weekNumber) {
-      filter.weekNumber = Number(weekNumber);
+      filter.weekNumber =
+        Number(weekNumber);
     }
 
     if (studentName) {
-      filter.studentName = studentName;
+      filter.studentName =
+        studentName;
     }
 
     const applications =
-      await LeaveApplication.find(filter)
+      await LeaveApplication.find(
+        filter
+      )
         .populate("violationId")
-        .sort({ submittedAt: -1 });
+        .sort({
+          submittedAt: -1,
+        });
 
     res.json({
       success: true,
@@ -220,266 +277,299 @@ const getApplications = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Không thể lấy danh sách đơn",
+      message:
+        "Không thể lấy danh sách đơn",
       error: error.message,
     });
   }
 };
 
-// ======================================================
-// 4. XEM CHI TIẾT MỘT ĐƠN
-// ======================================================
-const getApplicationById = async (req, res) => {
-  try {
-    const { id } = req.params;
+// ============================================================
+// 👁️ XEM CHI TIẾT ĐƠN
+// ============================================================
 
-    const application =
-      await LeaveApplication.findById(id)
-        .populate("violationId");
+exports.getApplicationById =
+  async (req, res) => {
+    try {
+      const { id } =
+        req.params;
 
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Không tìm thấy đơn",
+      const application =
+        await LeaveApplication.findById(
+          id
+        ).populate(
+          "violationId"
+        );
+
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Không tìm thấy đơn",
+        });
+      }
+
+      res.json({
+        success: true,
+        data: application,
       });
-    }
+    } catch (error) {
+      console.error(
+        "❌ Lỗi getApplicationById:",
+        error
+      );
 
-    res.json({
-      success: true,
-      data: application,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Lỗi getApplicationById:",
-      error
-    );
-
-    res.status(500).json({
-      success: false,
-      message: "Không thể lấy chi tiết đơn",
-      error: error.message,
-    });
-  }
-};
-
-// ======================================================
-// 5. DUYỆT ĐƠN
-// ======================================================
-const approveApplication = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const {
-      processedBy = "",
-      note = "",
-    } = req.body;
-
-    const application =
-      await LeaveApplication.findById(id);
-
-    if (!application) {
-      return res.status(404).json({
-        success: false,
-        message: "Không tìm thấy đơn",
-      });
-    }
-
-    if (
-      application.status === "APPROVED"
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Đơn này đã được duyệt",
-      });
-    }
-
-    // Chỉ duyệt khi chưa bị quá hạn
-    if (
-      application.status === "OVERDUE"
-    ) {
-      return res.status(400).json({
+      res.status(500).json({
         success: false,
         message:
-          "Đơn đã quá hạn, không thể duyệt",
+          "Không thể lấy chi tiết đơn",
+        error: error.message,
       });
     }
+  };
 
-    application.status = "APPROVED";
-    application.processedAt = new Date();
-    application.processedBy = processedBy;
-    application.note = note;
+// ============================================================
+// ✅ DUYỆT ĐƠN
+// ============================================================
 
-    await application.save();
+exports.approveApplication =
+  async (req, res) => {
+    try {
+      const { id } =
+        req.params;
 
-    // Vi phạm được duyệt -> không còn bị trừ điểm
-    const violation =
-      await Violation.findById(
-        application.violationId
+      const {
+        processedBy = "",
+        note = "",
+      } = req.body;
+
+      const application =
+        await LeaveApplication.findById(
+          id
+        );
+
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Không tìm thấy đơn",
+        });
+      }
+
+      if (
+        application.status ===
+        "APPROVED"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Đơn này đã được duyệt",
+        });
+      }
+
+      if (
+        application.status ===
+        "OVERDUE"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Đơn đã quá hạn, không thể duyệt",
+        });
+      }
+
+      application.status =
+        "APPROVED";
+
+      application.processedAt =
+        new Date();
+
+      application.processedBy =
+        processedBy;
+
+      application.note =
+        note;
+
+      await application.save();
+
+      // APPROVED → không tính vi phạm
+      const violation =
+        await Violation.findById(
+          application.violationId
+        );
+
+      if (violation) {
+        await updateStudentConductScore(
+          violation.name,
+          violation.className,
+          violation.academicYear,
+          violation.weekNumber
+        );
+      }
+
+      res.json({
+        success: true,
+        message:
+          "Đã duyệt đơn xin phép",
+        data: application,
+      });
+    } catch (error) {
+      console.error(
+        "❌ Lỗi approveApplication:",
+        error
       );
 
-    if (violation) {
-      await updateStudentConductScore(
-        violation.name,
-        violation.className,
-        violation.academicYear,
-        violation.weekNumber
-      );
-    }
-
-    res.json({
-      success: true,
-      message: "Đã duyệt đơn xin phép",
-      data: application,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Lỗi approveApplication:",
-      error
-    );
-
-    res.status(500).json({
-      success: false,
-      message: "Không thể duyệt đơn",
-      error: error.message,
-    });
-  }
-};
-
-// ======================================================
-// 6. TỪ CHỐI ĐƠN
-// ======================================================
-const rejectApplication = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const {
-      processedBy = "",
-      note = "",
-    } = req.body;
-
-    const application =
-      await LeaveApplication.findById(id);
-
-    if (!application) {
-      return res.status(404).json({
+      res.status(500).json({
         success: false,
-        message: "Không tìm thấy đơn",
+        message:
+          "Không thể duyệt đơn",
+        error: error.message,
       });
     }
+  };
 
-    application.status = "REJECTED";
-    application.processedAt = new Date();
-    application.processedBy = processedBy;
-    application.note = note;
+// ============================================================
+// ❌ TỪ CHỐI ĐƠN
+// ============================================================
 
-    await application.save();
+exports.rejectApplication =
+  async (req, res) => {
+    try {
+      const { id } =
+        req.params;
 
-    // REJECTED -> vi phạm vẫn được tính
-    const violation =
-      await Violation.findById(
-        application.violationId
+      const {
+        processedBy = "",
+        note = "",
+      } = req.body;
+
+      const application =
+        await LeaveApplication.findById(
+          id
+        );
+
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Không tìm thấy đơn",
+        });
+      }
+
+      application.status =
+        "REJECTED";
+
+      application.processedAt =
+        new Date();
+
+      application.processedBy =
+        processedBy;
+
+      application.note =
+        note;
+
+      await application.save();
+
+      // REJECTED → vẫn tính vi phạm
+      const violation =
+        await Violation.findById(
+          application.violationId
+        );
+
+      if (violation) {
+        await updateStudentConductScore(
+          violation.name,
+          violation.className,
+          violation.academicYear,
+          violation.weekNumber
+        );
+      }
+
+      res.json({
+        success: true,
+        message:
+          "Đã từ chối đơn xin phép",
+        data: application,
+      });
+    } catch (error) {
+      console.error(
+        "❌ Lỗi rejectApplication:",
+        error
       );
 
-    if (violation) {
-      await updateStudentConductScore(
-        violation.name,
-        violation.className,
-        violation.academicYear,
-        violation.weekNumber
-      );
-    }
-
-    res.json({
-      success: true,
-      message: "Đã từ chối đơn xin phép",
-      data: application,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Lỗi rejectApplication:",
-      error
-    );
-
-    res.status(500).json({
-      success: false,
-      message: "Không thể từ chối đơn",
-      error: error.message,
-    });
-  }
-};
-
-// ======================================================
-// 7. CHUYỂN ĐƠN SANG QUÁ HẠN
-// ======================================================
-const markApplicationOverdue = async (
-  req,
-  res
-) => {
-  try {
-    const { id } = req.params;
-
-    const application =
-      await LeaveApplication.findById(id);
-
-    if (!application) {
-      return res.status(404).json({
+      res.status(500).json({
         success: false,
-        message: "Không tìm thấy đơn",
+        message:
+          "Không thể từ chối đơn",
+        error: error.message,
       });
     }
+  };
 
-    application.status = "OVERDUE";
-    application.processedAt = new Date();
+// ============================================================
+// ⏰ CHUYỂN ĐƠN SANG QUÁ HẠN
+// ============================================================
 
-    await application.save();
+exports.markApplicationOverdue =
+  async (req, res) => {
+    try {
+      const { id } =
+        req.params;
 
-    // OVERDUE -> tính lại điểm
-    // Violation gốc vẫn còn nên điểm vi phạm
-    // sẽ tự động được tính trở lại
-    const violation =
-      await Violation.findById(
-        application.violationId
+      const application =
+        await LeaveApplication.findById(
+          id
+        );
+
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Không tìm thấy đơn",
+        });
+      }
+
+      application.status =
+        "OVERDUE";
+
+      application.processedAt =
+        new Date();
+
+      await application.save();
+
+      // OVERDUE → tính lại điểm
+      // Violation gốc vẫn còn
+      const violation =
+        await Violation.findById(
+          application.violationId
+        );
+
+      if (violation) {
+        await updateStudentConductScore(
+          violation.name,
+          violation.className,
+          violation.academicYear,
+          violation.weekNumber
+        );
+      }
+
+      res.json({
+        success: true,
+        message:
+          "Đơn đã chuyển sang trạng thái quá hạn",
+        data: application,
+      });
+    } catch (error) {
+      console.error(
+        "❌ Lỗi markApplicationOverdue:",
+        error
       );
 
-    if (violation) {
-      await updateStudentConductScore(
-        violation.name,
-        violation.className,
-        violation.academicYear,
-        violation.weekNumber
-      );
+      res.status(500).json({
+        success: false,
+        message:
+          "Không thể chuyển đơn sang quá hạn",
+        error: error.message,
+      });
     }
-
-    res.json({
-      success: true,
-      message:
-        "Đơn đã chuyển sang trạng thái quá hạn",
-      data: application,
-    });
-  } catch (error) {
-    console.error(
-      "❌ Lỗi markApplicationOverdue:",
-      error
-    );
-
-    res.status(500).json({
-      success: false,
-      message:
-        "Không thể chuyển đơn sang quá hạn",
-      error: error.message,
-    });
-  }
-};
-
-// ======================================================
-// EXPORT
-// ======================================================
-module.exports = {
-  getEligibleViolations,
-  createApplication,
-  getApplications,
-  getApplicationById,
-  approveApplication,
-  rejectApplication,
-  markApplicationOverdue,
-};
+  };
