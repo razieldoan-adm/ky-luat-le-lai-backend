@@ -2,7 +2,10 @@ const express = require("express");
 const router = express.Router();
 
 const controller = require("../controllers/leaveApplicationController");
-const { verifyToken } = require("../middlewares/authMiddleware");
+const {
+  verifyToken,
+  isAdmin,
+} = require("../middlewares/authMiddleware");
 
 // ============================================================
 // 📝 ĐƠN XIN PHÉP VI PHẠM
@@ -22,10 +25,15 @@ router.post(
   controller.createApplication
 );
 
-// Lấy danh sách đơn
+// ============================================================
+// 👨‍💼 ADMIN QUẢN LÝ ĐƠN
+// ============================================================
+
+// Xem danh sách đơn
 router.get(
   "/",
   verifyToken,
+  isAdmin,
   controller.getApplications
 );
 
@@ -33,6 +41,7 @@ router.get(
 router.get(
   "/:id",
   verifyToken,
+  isAdmin,
   controller.getApplicationById
 );
 
@@ -40,6 +49,7 @@ router.get(
 router.patch(
   "/:id/approve",
   verifyToken,
+  isAdmin,
   controller.approveApplication
 );
 
@@ -47,13 +57,15 @@ router.patch(
 router.patch(
   "/:id/reject",
   verifyToken,
+  isAdmin,
   controller.rejectApplication
 );
 
-// Đánh dấu đơn quá hạn
+// Đánh dấu quá hạn
 router.patch(
   "/:id/overdue",
   verifyToken,
+  isAdmin,
   controller.markApplicationOverdue
 );
 
