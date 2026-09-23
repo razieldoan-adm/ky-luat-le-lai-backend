@@ -1064,15 +1064,13 @@ exports.deleteViolation = async (req, res) => {
       }
     );
 
-   // ==========================================================
+// ==========================================================
 // 4. TÍNH LẠI ĐIỂM HẠNH KIỂM
 // ==========================================================
-// Không tự trừ thủ công nữa.
 // updateStudentConductScore sẽ:
 // - lấy lại toàn bộ Violation còn lại
-// - kiểm tra LeaveApplication
-// - APPROVED → bỏ qua
-// - PENDING / REJECTED / OVERDUE → vẫn tính
+// - mọi Violation đều được tính vào hạnh kiểm
+// - không phụ thuộc LeaveApplication
 // ==========================================================
 
 const conductScore =
