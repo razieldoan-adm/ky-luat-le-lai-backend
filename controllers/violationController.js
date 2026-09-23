@@ -2,6 +2,7 @@ const Violation = require('../models/Violation');
 const Rule = require('../models/Rule');
 const Setting = require('../models/Setting');
 const StudentConductScore = require('../models/StudentConductScore');
+const LeaveApplication = require('../models/LeaveApplication');
 const createAuditLog = require("../utils/createAuditLog");
 const sharp = require("sharp");
 
@@ -128,6 +129,7 @@ const updateStudentConductScore = async (
 const violations = await Violation.find({
   name: name,
   className: classNormalized,
+  academicYear: String(academicYear).trim(),
   weekNumber: week,
 });
 
@@ -189,6 +191,21 @@ if (violations.length > 0) {
   // ==========================================================
 
   for (const violation of violations) {
+
+    // Kiểm tra đơn xin phép của vi phạm này
+    const application = await LeaveApplication.findOne({
+      violationId: violation._id,
+    });
+    
+    // Chỉ khi đơn được DUYỆT thì vi phạm mới không bị trừ điểm
+    if (application && application.status === "APPROVED") {
+      continue;
+    }
+    // ==========================================
+    // PENDING / REJECTED / OVERDUE
+    // → TÍNH VI PHẠM BÌNH THƯỜNG
+    // ==========================================  
+    
     const groupCode =
       await getGroupCode(violation);
 
