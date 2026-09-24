@@ -328,86 +328,64 @@ exports.getApplicationById =
 // ✅ DUYỆT ĐƠN
 // ============================================================
 
-exports.approveApplication =
-  async (req, res) => {
-    try {
-      const { id } =
-        req.params;
+exports.approveApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-      const {
-        processedBy = "",
-        note = "",
-      } = req.body;
+    const application = await LeaveApplication.findById(id);
 
-      const application =
-        await LeaveApplication.findById(
-          id
-        );
-
-      if (!application) {
-        return res.status(404).json({
-          success: false,
-          message:
-            "Không tìm thấy đơn",
-        });
-      }
-
-      if (
-        application.status ===
-        "APPROVED"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Đơn này đã được duyệt",
-        });
-      }
-
-      if (
-        application.status ===
-        "OVERDUE"
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Đơn đã quá hạn, không thể duyệt",
-        });
-      }
-
-      application.status =
-        "APPROVED";
-
-      application.processedAt =
-        new Date();
-
-      application.processedBy =
-        processedBy;
-
-      application.note =
-        note;
-
-      await application.save();
-
-      res.json({
-        success: true,
-        message:
-          "Đã duyệt đơn xin phép",
-        data: application,
-      });
-    } catch (error) {
-      console.error(
-        "❌ Lỗi approveApplication:",
-        error
-      );
-
-      res.status(500).json({
+    if (!application) {
+      return res.status(404).json({
         success: false,
-        message:
-          "Không thể duyệt đơn",
-        error: error.message,
+        message: "Không tìm thấy đơn",
       });
     }
-  };
+
+    if (application.status === "APPROVED") {
+      return res.status(400).json({
+        success: false,
+        message: "Đơn này đã được duyệt",
+      });
+    }
+
+    if (application.status === "OVERDUE") {
+      return res.status(400).json({
+        success: false,
+        message: "Đơn đã quá hạn, không thể duyệt",
+      });
+    }
+
+    // Lấy người duyệt từ tài khoản đang đăng nhập
+    const processedBy =
+      req.user?.username ||
+      req.user?.name ||
+      req.user?.email ||
+      "";
+
+    application.status = "APPROVED";
+    application.processedAt = new Date();
+    application.processedBy = processedBy;
+
+    // Khi duyệt không bắt buộc phải có ghi chú
+    application.note = application.note || "";
+
+    await application.save();
+
+    return res.json({
+      success: true,
+      message: "Đã duyệt đơn xin phép",
+      data: application,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi approveApplication:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Không thể duyệt đơn",
+      error: error.message,
+    });
+  }
+};
 
 // ============================================================
 // ❌ TỪ CHỐI ĐƠN
