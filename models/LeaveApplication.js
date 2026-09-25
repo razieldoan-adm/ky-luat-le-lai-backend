@@ -9,7 +9,8 @@ const leaveApplicationSchema = new mongoose.Schema(
     violationId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Violation',
-      required: true,
+      required: false,
+      index: true,
     },
 
     // ==========================================
@@ -163,6 +164,7 @@ leaveApplicationSchema.index(
   },
   {
     unique: true,
+    sparse: true,
   }
 );
 
