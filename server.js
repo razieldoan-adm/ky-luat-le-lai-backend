@@ -35,6 +35,8 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 
 const leaveApplicationRoutes = require('./routes/leaveApplicationRoutes');
+const directLeaveRuleSettingRoutes = require('./routes/directLeaveRuleSettingRoutes');
+
 
 dotenv.config();
 
@@ -80,6 +82,8 @@ app.use("/api/google-drive",googleDriveRoutes);
 app.use("/api/audit-logs",auditLogRoutes);
 
 app.use("/api/leave-applications", leaveApplicationRoutes);
+app.use('/api/direct-leave-rules',directLeaveRuleSettingRoutes);
+
 
 // Kết nối MongoDB
 mongoose.connect(process.env.MONGO_URI, {
