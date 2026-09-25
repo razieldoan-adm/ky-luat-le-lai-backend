@@ -573,6 +573,17 @@ exports.rejectApplication =
           id
         );
 
+      console.log("🔴 REJECT APPLICATION:", {
+  id,
+  studentName: application?.studentName,
+  className: application?.className,
+  ruleCode: application?.ruleCode,
+  groupCode: application?.groupCode,
+  academicYear: application?.academicYear,
+  weekNumber: application?.weekNumber,
+  violationId: application?.violationId,
+});
+      
       if (!application) {
         return res.status(404).json({
           success: false,
@@ -584,6 +595,7 @@ exports.rejectApplication =
       // Nếu là đơn xin phép trực tiếp thì chưa có violationId.
       // Khi bị từ chối -> tạo Violation như một vi phạm bình thường.
       if (!application.violationId) {
+        console.log("🟡 Đơn trực tiếp chưa có Violation → chuẩn bị tạo Violation");
         const violation = await Violation.create({
           name: application.studentName,
           className: application.className,
