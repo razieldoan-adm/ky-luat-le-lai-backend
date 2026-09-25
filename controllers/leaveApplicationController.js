@@ -209,7 +209,173 @@ exports.createApplication = async (
     });
   }
 };
+// ============================================================
+// 📝 TẠO ĐƠN XIN PHÉP TRỰC TIẾP
+//
+// Luồng:
+// Học sinh -> PENDING
+// Chưa tạo Violation
+// violationId để trống
+// ============================================================
 
+exports.createDirectApplication = async (req, res) => {
+  try {
+    const {
+      studentName,
+      className,
+      academicYear,
+      weekNumber,
+      ruleCode,
+      groupCode,
+      description,
+      originalPenalty,
+      note = '',
+    } = req.body;
+
+    // --------------------------------------------------------
+    // Kiểm tra dữ liệu bắt buộc
+    // --------------------------------------------------------
+
+    if (!studentName || !className) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu tên học sinh hoặc lớp.',
+      });
+    }
+
+    if (!academicYear) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu năm học.',
+      });
+    }
+
+    if (!weekNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu tuần học.',
+      });
+    }
+
+    if (!ruleCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Chưa chọn nội dung vi phạm.',
+      });
+    }
+
+    if (!description) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu nội dung vi phạm.',
+      });
+    }
+
+    // --------------------------------------------------------
+    // Kiểm tra rule có tồn tại và đang active
+    // --------------------------------------------------------
+
+    const Rule = require('../models/Rule');
+
+    const rule = await Rule.findOne({
+      ruleCode: String(ruleCode).trim().toUpperCase(),
+      active: true,
+    });
+
+    if (!rule) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nội dung vi phạm không hợp lệ hoặc đã bị tắt.',
+      });
+    }
+
+    // --------------------------------------------------------
+    // Kiểm tra ruleCode có đúng groupCode không
+    // --------------------------------------------------------
+
+    const normalizedGroupCode = String(
+      groupCode || rule.groupCode || ''
+    )
+      .trim()
+      .toUpperCase();
+
+    // --------------------------------------------------------
+    // Điểm phạt lấy từ Rule
+    // Không tin điểm do frontend gửi lên
+    // --------------------------------------------------------
+
+    const penalty = Number(rule.point) || 0;
+
+    // --------------------------------------------------------
+    // Kiểm tra đã có đơn PENDING cho học sinh + lỗi + tuần chưa
+    // --------------------------------------------------------
+
+    const existingApplication =
+      await LeaveApplication.findOne({
+        studentName: studentName.trim(),
+        className: className.trim(),
+        academicYear: academicYear.trim(),
+        weekNumber: Number(weekNumber),
+        ruleCode: rule.ruleCode,
+        status: 'PENDING',
+        violationId: { $exists: false },
+      });
+
+    if (existingApplication) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Học sinh này đã có đơn xin phép đang chờ duyệt cho lỗi này.',
+        data: existingApplication,
+      });
+    }
+
+    // --------------------------------------------------------
+    // TẠO ĐƠN
+    //
+    // Quan trọng:
+    // KHÔNG có violationId
+    // KHÔNG tạo Violation
+    // --------------------------------------------------------
+
+    const application = await LeaveApplication.create({
+      studentName: studentName.trim(),
+      className: className.trim(),
+      academicYear: academicYear.trim(),
+      weekNumber: Number(weekNumber),
+
+      ruleCode: rule.ruleCode,
+      groupCode: normalizedGroupCode,
+      description: rule.title,
+
+      // Lấy trực tiếp từ Rule
+      originalPenalty: penalty,
+
+      status: 'PENDING',
+
+      submittedAt: new Date(),
+
+      note: String(note || '').trim(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Đã nộp đơn xin phép trực tiếp.',
+      data: application,
+    });
+  } catch (error) {
+    console.error(
+      '❌ Lỗi createDirectApplication:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể tạo đơn xin phép trực tiếp.',
+      error: error.message,
+    });
+  }
+};
 // ============================================================
 // 📋 LẤY DANH SÁCH ĐƠN
 // ============================================================
