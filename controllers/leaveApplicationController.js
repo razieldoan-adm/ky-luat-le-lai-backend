@@ -581,17 +581,33 @@ exports.rejectApplication =
         });
       }
 
-      application.status =
-        "REJECTED";
+      // Nếu là đơn xin phép trực tiếp thì chưa có violationId.
+      // Khi bị từ chối -> tạo Violation như một vi phạm bình thường.
+      if (!application.violationId) {
+        const violation = await Violation.create({
+          name: application.studentName,
+          className: application.className,
+          description: application.description || "",
+          ruleCode: application.ruleCode || "",
+          groupCode: application.groupCode || "",
+          academicYear: application.academicYear,
+          penalty: application.originalPenalty || 0,
+          weekNumber: application.weekNumber,
+          time: new Date(),
+          handlingMethod: "",
+          handledBy: "",
+          handlingNote: "",
+          handled: false,
+        });
 
-      application.processedAt =
-        new Date();
+        // Liên kết đơn với vi phạm vừa tạo
+        application.violationId = violation._id;
+      }
 
-      application.processedBy =
-        processedBy;
-
-      application.note =
-        note;
+      application.status = "REJECTED";
+      application.processedAt = new Date();
+      application.processedBy = processedBy;
+      application.note = note;
 
       await application.save();
 
