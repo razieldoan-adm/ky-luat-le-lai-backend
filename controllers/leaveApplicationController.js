@@ -2,6 +2,7 @@ const LeaveApplication = require("../models/LeaveApplication");
 const Violation = require("../models/Violation");
 const Rule = require("../models/Rule");
 const createAuditLog = require("../utils/createAuditLog");
+const { updateStudentConductScore,} = require("./violationController");
 // ============================================================
 // 📋 LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
 // ============================================================
