@@ -25,6 +25,11 @@ router.post(
   controller.createApplication
 );
 
+router.post(
+  "/direct",
+  verifyToken,
+  controller.createDirectApplication
+);
 // ============================================================
 // 👨‍💼 ADMIN QUẢN LÝ ĐƠN
 // ============================================================
