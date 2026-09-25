@@ -1,6 +1,7 @@
 const LeaveApplication = require("../models/LeaveApplication");
 const Violation = require("../models/Violation");
-
+const Rule = require("../models/Rule");
+const createAuditLog = require("../utils/createAuditLog");
 // ============================================================
 // 📋 LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
 // ============================================================
@@ -553,68 +554,170 @@ exports.approveApplication = async (req, res) => {
   }
 };
 
-// ============================================================
-// ❌ TỪ CHỐI ĐƠN
-// ============================================================
-
-exports.rejectApplication =
-  async (req, res) => {
-    try {
-      const { id } =
-        req.params;
-
-      const {
-        processedBy = "",
-        note = "",
-      } = req.body;
-
-      const application =
-        await LeaveApplication.findById(
-          id
-        );
-
-      console.log("🔴 REJECT APPLICATION:", {
-  id,
-  studentName: application?.studentName,
-  className: application?.className,
-  ruleCode: application?.ruleCode,
-  groupCode: application?.groupCode,
-  academicYear: application?.academicYear,
-  weekNumber: application?.weekNumber,
-  violationId: application?.violationId,
-});
-      
-      if (!application) {
-        return res.status(404).json({
+    // ============================================================
+    // ❌ TỪ CHỐI ĐƠN
+    // ============================================================
+    
+    exports.rejectApplication =
+      async (req, res) => {
+        try {
+          const { id } =
+            req.params;
+    
+          const {
+            processedBy = "",
+            note = "",
+          } = req.body;
+    
+          const application =
+            await LeaveApplication.findById(
+              id
+            );
+    
+          console.log("🔴 REJECT APPLICATION:", {
+      id,
+      studentName: application?.studentName,
+      className: application?.className,
+      ruleCode: application?.ruleCode,
+      groupCode: application?.groupCode,
+      academicYear: application?.academicYear,
+      weekNumber: application?.weekNumber,
+      violationId: application?.violationId,
+    });
+          
+          if (!application) {
+            return res.status(404).json({
+              success: false,
+              message:
+                "Không tìm thấy đơn",
+            });
+          }
+    
+          // Nếu là đơn xin phép trực tiếp thì chưa có violationId.
+          // Khi bị từ chối -> tạo Violation như một vi phạm bình thường.
+    
+    
+          if (!application.violationId) {
+      console.log(
+        "🟡 Đơn trực tiếp chưa có Violation → chuẩn bị tạo Violation"
+      );
+    
+      // --------------------------------------------------------
+      // Lấy Rule giống luồng POST /api/violations
+      // --------------------------------------------------------
+    
+      const rule = await Rule.findOne({
+        ruleCode: String(application.ruleCode || "")
+          .trim()
+          .toUpperCase(),
+        active: true,
+      });
+    
+      if (!rule) {
+        return res.status(400).json({
           success: false,
           message:
-            "Không tìm thấy đơn",
+            "Không tìm thấy quy định vi phạm hoặc quy định đã bị tắt.",
         });
       }
-
-      // Nếu là đơn xin phép trực tiếp thì chưa có violationId.
-      // Khi bị từ chối -> tạo Violation như một vi phạm bình thường.
-      if (!application.violationId) {
-        console.log("🟡 Đơn trực tiếp chưa có Violation → chuẩn bị tạo Violation");
-        const violation = await Violation.create({
-          name: application.studentName,
-          className: application.className,
-          description: application.description || "",
-          ruleCode: application.ruleCode || "",
-          groupCode: application.groupCode || "",
-          academicYear: application.academicYear,
-          penalty: application.originalPenalty || 0,
-          weekNumber: application.weekNumber,
-          time: new Date(),
-          handlingMethod: "",
-          handledBy: "",
-          handlingNote: "",
-          handled: false,
-        });
-
-        // Liên kết đơn với vi phạm vừa tạo
-        application.violationId = violation._id;
-      }
+    
+      const normalizedClass = String(
+        application.className || ""
+      )
+        .trim()
+        .toUpperCase();
+    
+      const normalizedName = String(
+        application.studentName || ""
+      )
+        .trim()
+        .toLowerCase();
+    
+      const normalizedGroupCode = String(
+        application.groupCode || rule.groupCode || ""
+      )
+        .trim()
+        .toUpperCase();
+    
+      // --------------------------------------------------------
+      // Tạo Violation
+      // Điểm phạt lấy từ Rule, không lấy từ frontend
+      // --------------------------------------------------------
+    
+      const violation = new Violation({
+        name: normalizedName,
+        className: normalizedClass,
+        description:
+          application.description || rule.title,
+        ruleCode: rule.ruleCode,
+        groupCode: normalizedGroupCode,
+        academicYear: String(
+          application.academicYear
+        ).trim(),
+        penalty:
+          typeof rule.point === "number"
+            ? rule.point
+            : 0,
+        handlingMethod: "",
+        handledBy: "",
+        handlingNote: "",
+        handled: false,
+        weekNumber: Number(
+          application.weekNumber
+        ),
+        time: new Date(),
+      });
+    
+      await violation.save();
+    
+      console.log(
+        "🟢 ĐÃ TẠO VIOLATION:",
+        violation._id
+      );
+    
+      // --------------------------------------------------------
+      // Ghi lịch sử tạo Violation
+      // --------------------------------------------------------
+    
+      await createAuditLog({
+        req,
+    
+        action: "CREATE",
+    
+        module: "VIOLATION",
+    
+        targetId: violation._id,
+    
+        studentName: violation.name,
+    
+        className: violation.className,
+    
+        academicYear: violation.academicYear,
+    
+        weekNumber: violation.weekNumber,
+    
+        beforeData: null,
+    
+        afterData: violation.toObject(),
+      });
+    
+      // --------------------------------------------------------
+      // Cập nhật hạnh kiểm
+      // --------------------------------------------------------
+    
+      await updateStudentConductScore(
+        violation.name,
+        violation.className,
+        violation.academicYear,
+        violation.weekNumber
+      );
+    
+      // --------------------------------------------------------
+      // Liên kết đơn với Violation vừa tạo
+      // --------------------------------------------------------
+    
+      application.violationId = violation._id;
+    }
 
       application.status = "REJECTED";
       application.processedAt = new Date();
