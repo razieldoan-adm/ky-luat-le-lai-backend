@@ -147,49 +147,28 @@ exports.createApplication = async (
       });
     }
 
-    const application =
-      await LeaveApplication.create({
-        violationId:
-          violation._id,
+const application = await LeaveApplication.create({
+  studentName: studentName.trim(),
+  className: className.trim(),
+  academicYear: academicYear.trim(),
+  weekNumber: Number(weekNumber),
 
-        studentName:
-          violation.name,
+  ruleCode: rule.ruleCode,
+  groupCode: normalizedGroupCode,
+  description: rule.title,
 
-        className:
-          violation.className,
+  // Lấy trực tiếp từ Rule
+  originalPenalty: penalty,
 
-        academicYear:
-          violation.academicYear,
+  status: 'PENDING',
 
-        weekNumber:
-          violation.weekNumber,
+  submittedAt,
 
-        ruleCode:
-          violation.ruleCode,
+  // 🔢 Lưu cố định thứ tự lần nộp
+  submissionNumber,
 
-        groupCode:
-          violation.groupCode,
-
-        description:
-          violation.description,
-
-        originalPenalty:
-          violation.penalty || 0,
-
-        status: "PENDING",
-
-        submittedAt:
-          new Date(),
-
-        deadlineAt:
-          deadlineAt
-            ? new Date(
-                deadlineAt
-              )
-            : null,
-
-        note: note || "",
-      });
+  note: String(note || '').trim(),
+});
 
     res.status(201).json({
       success: true,
@@ -332,6 +311,44 @@ exports.createDirectApplication = async (req, res) => {
       });
     }
 
+
+    // --------------------------------------------------------
+// XÁC ĐỊNH SỐ LẦN NỘP TRONG THÁNG
+// Cùng học sinh + lớp + năm học + lỗi
+// --------------------------------------------------------
+
+const submittedAt = new Date();
+
+const startOfMonth = new Date(
+  submittedAt.getFullYear(),
+  submittedAt.getMonth(),
+  1
+);
+
+const startOfNextMonth = new Date(
+  submittedAt.getFullYear(),
+  submittedAt.getMonth() + 1,
+  1
+);
+
+const submissionCount =
+  await LeaveApplication.countDocuments({
+    studentName: studentName.trim(),
+    className: className.trim(),
+    academicYear: academicYear.trim(),
+    ruleCode: rule.ruleCode,
+
+    submittedAt: {
+      $gte: startOfMonth,
+      $lt: startOfNextMonth,
+    },
+  });
+
+const submissionNumber = submissionCount + 1;
+
+console.log(
+  `🔢 ${studentName} - ${rule.ruleCode}: Nộp lần ${submissionNumber}`
+);
     // --------------------------------------------------------
     // TẠO ĐƠN
     //
