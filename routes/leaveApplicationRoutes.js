@@ -65,6 +65,8 @@ router.patch(
 );
 
 // Từ chối đơn
+router.delete("/:id", verifyToken, isAdmin, controller.deleteApplication);
+// Từ chối đơn
 router.patch(
   "/:id/reject",
   verifyToken,
