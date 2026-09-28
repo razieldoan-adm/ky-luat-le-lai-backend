@@ -135,6 +135,10 @@ const leaveApplicationSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    isException: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
