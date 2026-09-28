@@ -153,6 +153,7 @@ leaveApplicationSchema.index({
   studentName: 1,
   className: 1,
   academicYear: 1,
+  ruleCode: 1,
   weekNumber: 1,
 });
 
