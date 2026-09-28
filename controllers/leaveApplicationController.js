@@ -577,6 +577,43 @@ exports.getApplicationById =
   };
 
 // ============================================================
+// 🗑️ XÓA ĐƠN XIN PHÉP
+// Chỉ xóa LeaveApplication
+// KHÔNG xóa Violation
+// ============================================================
+
+exports.deleteApplication = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const application = await LeaveApplication.findById(id);
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy đơn xin phép",
+      });
+    }
+
+    // Chỉ xóa đơn xin phép.
+    // Nếu đơn đã có violationId thì Violation vẫn được giữ nguyên.
+    await LeaveApplication.findByIdAndDelete(id);
+
+    return res.json({
+      success: true,
+      message: "Đã xóa đơn xin phép",
+    });
+  } catch (error) {
+    console.error("❌ Lỗi deleteApplication:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Không thể xóa đơn xin phép",
+      error: error.message,
+    });
+  }
+};
+// ============================================================
 // ✅ DUYỆT ĐƠN
 // ============================================================
 
