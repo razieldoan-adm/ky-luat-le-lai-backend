@@ -429,10 +429,77 @@ exports.getApplications = async (
           submittedAt: -1,
         });
 
-    res.json({
-      success: true,
-      data: applications,
-    });
+     const submissionCountMap = new Map();
+
+const studentRuleGroups = applications.map((app) => ({
+  studentName: app.studentName,
+  className: app.className,
+  academicYear: app.academicYear,
+  ruleCode: app.ruleCode,
+}));
+
+// ------------------------------------------------------------
+// Lấy tất cả đơn liên quan để tính chính xác số lần trong tháng
+// ------------------------------------------------------------
+
+for (const app of applications) {
+  if (!app.submittedAt) continue;
+
+  const submittedDate = new Date(app.submittedAt);
+
+  const startDate = new Date(
+    submittedDate.getFullYear(),
+    submittedDate.getMonth(),
+    1
+  );
+
+  const endDate = new Date(
+    submittedDate.getFullYear(),
+    submittedDate.getMonth() + 1,
+    1
+  );
+
+  const count = await LeaveApplication.countDocuments({
+    studentName: app.studentName,
+    className: app.className,
+    academicYear: app.academicYear,
+    ruleCode: app.ruleCode,
+
+    submittedAt: {
+      $gte: startDate,
+      $lt: endDate,
+    },
+  });
+
+  const key = String(app._id);
+
+  submissionCountMap.set(key, count);
+}
+    
+const data = applications.map((app) => {
+  const count =
+    submissionCountMap.get(String(app._id)) || 1;
+
+  return {
+    ...app.toObject(),
+
+    submissionCount: count,
+
+    submissionLabel: `Nộp lần ${count}`,
+
+    submissionLimit: 2,
+
+    submissionLimitReached: count >= 2,
+
+    submissionLimitExceeded: count > 2,
+  };
+});
+
+res.json({
+  success: true,
+  data,
+});
+    
   } catch (error) {
     console.error(
       "❌ Lỗi getApplications:",
