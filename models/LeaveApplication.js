@@ -116,7 +116,7 @@ const leaveApplicationSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-
+    
     // ==========================================
     // NGƯỜI XỬ LÝ
     // ==========================================
@@ -139,6 +139,10 @@ const leaveApplicationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+      submissionNumber: {
+    type: Number,
+    default: 1,
+  },
   },
   {
     timestamps: true,
