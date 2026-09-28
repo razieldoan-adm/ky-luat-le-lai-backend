@@ -799,3 +799,103 @@ exports.markApplicationOverdue =
       });
     }
   };
+// ============================================================
+// 🔢 ĐẾM SỐ LẦN HỌC SINH ĐÃ NỘP CÙNG MỘT LỖI TRONG THÁNG
+// ============================================================
+
+exports.getMonthlySubmissionCount = async (req, res) => {
+  try {
+    const {
+      studentName,
+      className,
+      academicYear,
+      ruleCode,
+      month,
+      year,
+    } = req.query;
+
+    if (
+      !studentName ||
+      !className ||
+      !academicYear ||
+      !ruleCode
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu thông tin để kiểm tra số lần nộp đơn.',
+      });
+    }
+
+    const now = new Date();
+
+    const targetMonth = Number(month) || now.getMonth() + 1;
+    const targetYear = Number(year) || now.getFullYear();
+
+    const startDate = new Date(
+      targetYear,
+      targetMonth - 1,
+      1,
+      0,
+      0,
+      0,
+      0
+    );
+
+    const endDate = new Date(
+      targetYear,
+      targetMonth,
+      1,
+      0,
+      0,
+      0,
+      0
+    );
+
+    const normalizedName = String(studentName)
+      .trim();
+
+    const normalizedClass = String(className)
+      .trim();
+
+    const normalizedRuleCode = String(ruleCode)
+      .trim()
+      .toUpperCase();
+
+    const count = await LeaveApplication.countDocuments({
+      studentName: normalizedName,
+      className: normalizedClass,
+      academicYear: String(academicYear).trim(),
+      ruleCode: normalizedRuleCode,
+
+      submittedAt: {
+        $gte: startDate,
+        $lt: endDate,
+      },
+    });
+
+    const limit = 2;
+
+    return res.json({
+      success: true,
+      data: {
+        count,
+        nextSubmissionNumber: count + 1,
+        limit,
+        exceeded: count >= limit,
+        month: targetMonth,
+        year: targetYear,
+      },
+    });
+  } catch (error) {
+    console.error(
+      '❌ Lỗi getMonthlySubmissionCount:',
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể kiểm tra số lần nộp đơn.',
+      error: error.message,
+    });
+  }
+};
