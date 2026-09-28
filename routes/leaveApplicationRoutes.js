@@ -42,6 +42,12 @@ router.get(
   controller.getApplications
 );
 
+router.get(
+  "/monthly-count",
+  verifyToken,
+  controller.getMonthlySubmissionCount
+);
+
 // Xem chi tiết đơn
 router.get(
   "/:id",
