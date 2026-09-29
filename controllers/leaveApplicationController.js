@@ -357,26 +357,27 @@ console.log(
     // KHÔNG tạo Violation
     // --------------------------------------------------------
 
-    const application = await LeaveApplication.create({
-      studentName: studentName.trim(),
-      className: className.trim(),
-      academicYear: academicYear.trim(),
-      weekNumber: Number(weekNumber),
+const application = await LeaveApplication.create({
+  studentName: studentName.trim(),
+  className: className.trim(),
+  academicYear: academicYear.trim(),
+  weekNumber: Number(weekNumber),
 
-      ruleCode: rule.ruleCode,
-      groupCode: normalizedGroupCode,
-      description: rule.title,
+  ruleCode: rule.ruleCode,
+  groupCode: normalizedGroupCode,
+  description: rule.title,
 
-      // Lấy trực tiếp từ Rule
-      originalPenalty: penalty,
+  originalPenalty: penalty,
 
-      status: 'PENDING',
+  status: 'PENDING',
 
-      submittedAt: new Date(),
+  submittedAt,
 
-      note: String(note || '').trim(),
-    });
+  // 🔢 Lưu cố định thứ tự lần nộp
+  submissionNumber,
 
+  note: String(note || '').trim(),
+});
     return res.status(201).json({
       success: true,
       message: 'Đã nộp đơn xin phép trực tiếp.',
@@ -446,69 +447,26 @@ exports.getApplications = async (
           submittedAt: -1,
         });
 
-     const submissionCountMap = new Map();
-
-const studentRuleGroups = applications.map((app) => ({
-  studentName: app.studentName,
-  className: app.className,
-  academicYear: app.academicYear,
-  ruleCode: app.ruleCode,
-}));
-
-// ------------------------------------------------------------
-// Lấy tất cả đơn liên quan để tính chính xác số lần trong tháng
-// ------------------------------------------------------------
-
-for (const app of applications) {
-  if (!app.submittedAt) continue;
-
-  const submittedDate = new Date(app.submittedAt);
-
-  const startDate = new Date(
-    submittedDate.getFullYear(),
-    submittedDate.getMonth(),
-    1
-  );
-
-  const endDate = new Date(
-    submittedDate.getFullYear(),
-    submittedDate.getMonth() + 1,
-    1
-  );
-
-  const count = await LeaveApplication.countDocuments({
-    studentName: app.studentName,
-    className: app.className,
-    academicYear: app.academicYear,
-    ruleCode: app.ruleCode,
-
-    submittedAt: {
-      $gte: startDate,
-      $lt: endDate,
-    },
-  });
-
-  const key = String(app._id);
-
-  submissionCountMap.set(key, count);
-}
-    
 const data = applications.map((app) => {
-  const count =
-    submissionCountMap.get(String(app._id)) || 1;
+  const submissionNumber =
+    Number(app.submissionNumber) || 1;
 
   return {
     ...app.toObject(),
 
-    submissionCount: count,
+    // 🔢 Số lần nộp cố định của chính đơn này
+    submissionNumber,
 
-    submissionLabel: `Nộp lần ${count}`,
+    submissionLabel:
+      `Nộp lần ${submissionNumber}`,
 
     submissionLimit: 2,
 
-    submissionLimitReached: count >= 2,
+    submissionLimitReached:
+      submissionNumber >= 2,
 
-    submissionLimitExceeded: count > 2,
+    submissionLimitExceeded:
+      submissionNumber > 2,
   };
 });
 
