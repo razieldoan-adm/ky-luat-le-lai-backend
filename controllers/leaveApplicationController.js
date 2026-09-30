@@ -98,98 +98,310 @@ exports.getEligibleViolations = async (req, res) => {
 // 📝 TẠO ĐƠN XIN PHÉP
 // ============================================================
 
-exports.createApplication = async (
-  req,
-  res
-) => {
+// ============================================================
+// 📝 TẠO ĐƠN XIN PHÉP TỪ VI PHẠM
+//
+// Frontend chỉ cần gửi:
+// {
+//   violationId,
+//   isException
+// }
+//
+// Backend tự lấy đầy đủ thông tin từ Violation + Rule
+// ============================================================
+
+exports.createApplication = async (req, res) => {
   try {
     const {
       violationId,
       deadlineAt,
-      note,
+      note = '',
+      isException = false,
     } = req.body;
+
+    // --------------------------------------------------------
+    // 1. Kiểm tra violationId
+    // --------------------------------------------------------
 
     if (!violationId) {
       return res.status(400).json({
         success: false,
-        message: "Thiếu violationId",
+        message: 'Thiếu violationId.',
       });
     }
 
-    // Tìm vi phạm
-    const violation =
-      await Violation.findById(
-        violationId
-      );
+    // --------------------------------------------------------
+    // 2. Tìm Violation
+    // --------------------------------------------------------
+
+    const violation = await Violation.findById(violationId);
 
     if (!violation) {
       return res.status(404).json({
         success: false,
-        message:
-          "Không tìm thấy vi phạm",
+        message: 'Không tìm thấy vi phạm.',
       });
     }
 
-    // Kiểm tra đã có đơn chưa
+    // --------------------------------------------------------
+    // 3. Kiểm tra vi phạm đã có đơn chưa
+    // --------------------------------------------------------
+
     const existingApplication =
       await LeaveApplication.findOne({
-        violationId:
-          violation._id,
+        violationId: violation._id,
       });
 
     if (existingApplication) {
       return res.status(400).json({
         success: false,
-        message:
-          "Vi phạm này đã có đơn xin phép",
-        application:
-          existingApplication,
+        message: 'Vi phạm này đã có đơn xin phép.',
+        data: existingApplication,
       });
     }
 
-const application = await LeaveApplication.create({
-  studentName: studentName.trim(),
-  className: className.trim(),
-  academicYear: academicYear.trim(),
-  weekNumber: Number(weekNumber),
+    // --------------------------------------------------------
+    // 4. Lấy thông tin cơ bản từ Violation
+    // --------------------------------------------------------
 
-  ruleCode: rule.ruleCode,
-  groupCode: normalizedGroupCode,
-  description: rule.title,
+    const studentName = String(
+      violation.name || ''
+    ).trim();
 
-  // Lấy trực tiếp từ Rule
-  originalPenalty: penalty,
+    const className = String(
+      violation.className || ''
+    ).trim();
 
-  status: 'PENDING',
+    const academicYear = String(
+      violation.academicYear || ''
+    ).trim();
 
-  submittedAt,
+    const weekNumber = Number(
+      violation.weekNumber || 0
+    );
 
-  // 🔢 Lưu cố định thứ tự lần nộp
-  submissionNumber,
+    const ruleCode = String(
+      violation.ruleCode || ''
+    ).trim().toUpperCase();
 
-  note: String(note || '').trim(),
-});
+    const groupCode = String(
+      violation.groupCode || ''
+    ).trim().toUpperCase();
 
-    res.status(201).json({
+    if (!studentName || !className) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vi phạm thiếu tên học sinh hoặc lớp.',
+      });
+    }
+
+    if (!academicYear) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vi phạm thiếu năm học.',
+      });
+    }
+
+    if (!weekNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vi phạm thiếu tuần học.',
+      });
+    }
+
+    if (!ruleCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vi phạm thiếu ruleCode.',
+      });
+    }
+
+    // --------------------------------------------------------
+    // 5. Tìm Rule
+    // --------------------------------------------------------
+
+    const rule = await Rule.findOne({
+      ruleCode,
+      active: true,
+    });
+
+    if (!rule) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Không tìm thấy nội dung vi phạm tương ứng hoặc nội dung đã bị tắt.',
+        ruleCode,
+      });
+    }
+
+    // --------------------------------------------------------
+    // 6. Chuẩn hóa groupCode
+    // --------------------------------------------------------
+
+    const normalizedGroupCode = String(
+      groupCode || rule.groupCode || ''
+    )
+      .trim()
+      .toUpperCase();
+
+    // --------------------------------------------------------
+    // 7. Điểm phạt lấy trực tiếp từ Rule
+    // Không lấy điểm từ frontend
+    // --------------------------------------------------------
+
+    const penalty = Number(rule.point) || 0;
+
+    // --------------------------------------------------------
+    // 8. Kiểm tra PENDING cùng vi phạm
+    // --------------------------------------------------------
+
+    const pendingApplication =
+      await LeaveApplication.findOne({
+        studentName,
+        className,
+        academicYear,
+        weekNumber,
+        ruleCode: rule.ruleCode,
+        status: 'PENDING',
+        violationId: violation._id,
+      });
+
+    if (pendingApplication) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Vi phạm này đã có đơn đang chờ duyệt.',
+        data: pendingApplication,
+      });
+    }
+
+    // --------------------------------------------------------
+    // 9. ĐẾM SỐ LẦN NỘP TRONG THÁNG
+    //
+    // Cùng:
+    // - học sinh
+    // - lớp
+    // - năm học
+    // - ruleCode
+    //
+    // Giống cơ chế Tạo đơn trực tiếp
+    // --------------------------------------------------------
+
+    const submittedAt = new Date();
+
+    const startOfMonth = new Date(
+      submittedAt.getFullYear(),
+      submittedAt.getMonth(),
+      1
+    );
+
+    const startOfNextMonth = new Date(
+      submittedAt.getFullYear(),
+      submittedAt.getMonth() + 1,
+      1
+    );
+
+    const submissionCount =
+      await LeaveApplication.countDocuments({
+        studentName,
+        className,
+        academicYear,
+        ruleCode: rule.ruleCode,
+
+        submittedAt: {
+          $gte: startOfMonth,
+          $lt: startOfNextMonth,
+        },
+      });
+
+    const submissionNumber =
+      submissionCount + 1;
+
+    console.log(
+      `🔢 ${studentName} - ${rule.ruleCode}: Nộp lần ${submissionNumber}`
+    );
+
+    // --------------------------------------------------------
+    // 10. Giới hạn 2 lần/tháng
+    //
+    // Nếu frontend chưa cho phép ngoại lệ thì chặn.
+    // --------------------------------------------------------
+
+    const submissionLimit = 2;
+
+    if (
+      submissionNumber > submissionLimit &&
+      !Boolean(isException)
+    ) {
+      return res.status(400).json({
+        success: false,
+        code: 'SUBMISSION_LIMIT_REACHED',
+        message:
+          `Học sinh đã nộp ${submissionCount} lần trong tháng cho lỗi này. Đã vượt giới hạn ${submissionLimit} lần.`,
+        submissionCount,
+        submissionNumber,
+        submissionLimit,
+      });
+    }
+
+    // --------------------------------------------------------
+    // 11. Tạo đơn
+    // --------------------------------------------------------
+
+    const application =
+      await LeaveApplication.create({
+        violationId: violation._id,
+
+        studentName,
+        className,
+        academicYear,
+        weekNumber,
+
+        ruleCode: rule.ruleCode,
+        groupCode: normalizedGroupCode,
+        description: rule.title,
+
+        originalPenalty: penalty,
+
+        status: 'PENDING',
+
+        submittedAt,
+
+        deadlineAt: deadlineAt
+          ? new Date(deadlineAt)
+          : null,
+
+        submissionNumber,
+
+        isException: Boolean(isException),
+
+        note: String(note || '').trim(),
+      });
+
+    // --------------------------------------------------------
+    // 12. Trả kết quả
+    // --------------------------------------------------------
+
+    return res.status(201).json({
       success: true,
-      message:
-        "Nộp đơn xin phép thành công",
+      message: 'Đã tạo đơn xin phép từ vi phạm.',
       data: application,
     });
+
   } catch (error) {
     console.error(
-      "❌ Lỗi createApplication:",
+      '❌ Lỗi createApplication:',
       error
     );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message:
-        "Không thể tạo đơn xin phép",
+      message: 'Không thể tạo đơn xin phép.',
       error: error.message,
     });
   }
 };
+
 // ============================================================
 // 📝 TẠO ĐƠN XIN PHÉP TRỰC TIẾP
 //
