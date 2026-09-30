@@ -4,6 +4,8 @@ const StudentMonthlyConduct =
 const StudentConductScore =
   require("../models/StudentConductScore");
 
+const AcademicWeek =
+  require("../models/AcademicWeek");
 // =====================================================
 // XẾP LOẠI NHIỀU TUẦN
 // =====================================================
@@ -66,7 +68,7 @@ const getMonthClassification = (
 };
 
 // =====================================================
-// CHỐT THÁNG CHO 1 LỚP
+// CHỐT THÁNG CHO TOÀN TRƯỜNG
 // =====================================================
 
 exports.finalizeMonth = async (
@@ -75,21 +77,23 @@ exports.finalizeMonth = async (
 ) => {
   try {
     const {
-      className,
       academicYear,
       month,
       year,
     } = req.body;
 
+    // =====================================================
+    // KIỂM TRA DỮ LIỆU
+    // =====================================================
+
     if (
-      !className ||
       !academicYear ||
       !month ||
       !year
     ) {
       return res.status(400).json({
         message:
-          "Thiếu className, academicYear, month hoặc year",
+          "Thiếu academicYear, month hoặc year",
       });
     }
 
@@ -99,111 +103,210 @@ exports.finalizeMonth = async (
     const yearNumber =
       Number(year);
 
-    // ---------------------------------------------
-    // LẤY TOÀN BỘ ĐIỂM TUẦN CỦA LỚP
-    // ---------------------------------------------
+    if (
+      !Number.isInteger(monthNumber) ||
+      monthNumber < 1 ||
+      monthNumber > 12 ||
+      !Number.isInteger(yearNumber)
+    ) {
+      return res.status(400).json({
+        message:
+          "Tháng hoặc năm không hợp lệ",
+      });
+    }
+
+    // =====================================================
+    // 1. XÁC ĐỊNH CÁC TUẦN THUỘC THÁNG
+    //
+    // Quy tắc:
+    // Tuần thuộc tháng dựa vào NGÀY BẮT ĐẦU của tuần.
+    // Không chia tuần theo ngày.
+    // =====================================================
+
+    const academicWeeks =
+      await AcademicWeek.find({
+        academicYear,
+        isStudyWeek: true,
+        weekNumber: {
+          $ne: null,
+        },
+      }).sort({
+        weekNumber: 1,
+      });
+
+    const monthWeeks =
+      academicWeeks.filter(
+        (week) => {
+          if (!week.startDate) {
+            return false;
+          }
+
+          const startDate =
+            new Date(
+              week.startDate
+            );
+
+          if (
+            Number.isNaN(
+              startDate.getTime()
+            )
+          ) {
+            return false;
+          }
+
+          return (
+            startDate.getMonth() + 1 ===
+              monthNumber &&
+            startDate.getFullYear() ===
+              yearNumber
+          );
+        }
+      );
+
+    const monthWeekNumbers =
+      monthWeeks
+        .map(
+          (week) =>
+            Number(
+              week.weekNumber
+            )
+        )
+        .filter(
+          (weekNumber) =>
+            Number.isInteger(
+              weekNumber
+            )
+        );
+
+    if (
+      monthWeekNumbers.length === 0
+    ) {
+      return res.status(400).json({
+        message:
+          `Không tìm thấy tuần học nào thuộc tháng ${monthNumber}/${yearNumber}`,
+      });
+    }
+
+    // =====================================================
+    // 2. LẤY ĐIỂM HẠNH KIỂM TUẦN
+    //    TOÀN TRƯỜNG
+    //
+    // Không lọc className.
+    // =====================================================
 
     const weeklyScores =
       await StudentConductScore.find({
-        className,
         academicYear,
         status: "FINAL",
+        weekNumber: {
+          $in:
+            monthWeekNumbers,
+        },
       }).sort({
+        className: 1,
         name: 1,
         weekNumber: 1,
       });
 
-    // ---------------------------------------------
-    // NHÓM THEO HỌC SINH
-    // ---------------------------------------------
+    if (
+      weeklyScores.length === 0
+    ) {
+      return res.status(400).json({
+        message:
+          `Chưa có điểm hạnh kiểm tuần FINAL cho tháng ${monthNumber}/${yearNumber}`,
+      });
+    }
+
+    // =====================================================
+    // 3. NHÓM THEO HỌC SINH + LỚP
+    // =====================================================
 
     const studentMap =
       new Map();
 
     weeklyScores.forEach(
       (score) => {
+        const key =
+          `${score.className}__${score.name}`;
+
         if (
-          !studentMap.has(
-            score.name
-          )
+          !studentMap.has(key)
         ) {
           studentMap.set(
-            score.name,
+            key,
             []
           );
         }
 
         studentMap
-          .get(score.name)
+          .get(key)
           .push(score);
       }
     );
 
     const results = [];
 
-    // ---------------------------------------------
-    // TÍNH HẠNH KIỂM THÁNG
-    // ---------------------------------------------
+    // =====================================================
+    // 4. TÍNH HẠNH KIỂM THÁNG
+    // =====================================================
 
     for (
       const [
-        name,
+        key,
         scores,
       ] of studentMap
     ) {
-      const monthScores =
-        scores.filter(
-          (score) => {
-            const createdDate =
-              score.createdAt;
+      const firstScore =
+        scores[0];
 
-            if (!createdDate) {
-              return false;
-            }
+      const name =
+        firstScore.name;
 
-            const date =
-              new Date(
-                createdDate
-              );
-
-            return (
-              date.getMonth() + 1 ===
-                monthNumber &&
-              date.getFullYear() ===
-                yearNumber
-            );
-          }
-        );
+      const className =
+        firstScore.className;
 
       const classifications =
-        monthScores.map(
+        scores.map(
           (score) => {
             const value =
-              score.finalScore;
+              Number(
+                score.finalScore
+              );
 
             if (
               value >= 90
-            )
+            ) {
               return "Tốt";
+            }
 
             if (
               value >= 70
-            )
+            ) {
               return "Khá";
+            }
 
             if (
               value >= 50
-            )
+            ) {
               return "Đạt";
+            }
 
             return "Chưa đạt";
           }
         );
 
+      // ===================================================
+      // XẾP LOẠI THÁNG
+      // ===================================================
+
       const classification =
         getMonthClassification(
           classifications
         );
+
+      // ===================================================
+      // ĐẾM XẾP LOẠI
+      // ===================================================
 
       const counts = {
         tot: 0,
@@ -216,31 +319,56 @@ exports.finalizeMonth = async (
         (value) => {
           if (
             value === "Tốt"
-          )
+          ) {
             counts.tot++;
+          }
 
           if (
             value === "Khá"
-          )
+          ) {
             counts.kha++;
+          }
 
           if (
             value === "Đạt"
-          )
+          ) {
             counts.dat++;
+          }
 
           if (
             value === "Chưa đạt"
-          )
+          ) {
             counts.chuaDat++;
+          }
         }
       );
 
+      // ===================================================
+      // DANH SÁCH TUẦN ĐÃ CÓ ĐIỂM
+      // ===================================================
+
       const weekNumbers =
-        monthScores.map(
-          (score) =>
-            score.weekNumber
-        );
+        scores
+          .map(
+            (score) =>
+              Number(
+                score.weekNumber
+              )
+          )
+          .filter(
+            (weekNumber) =>
+              Number.isInteger(
+                weekNumber
+              )
+          )
+          .sort(
+            (a, b) =>
+              a - b
+          );
+
+      // ===================================================
+      // LƯU / CẬP NHẬT HẠNH KIỂM THÁNG
+      // ===================================================
 
       const saved =
         await StudentMonthlyConduct.findOneAndUpdate(
@@ -248,8 +376,10 @@ exports.finalizeMonth = async (
             name,
             className,
             academicYear,
-            month: monthNumber,
-            year: yearNumber,
+            month:
+              monthNumber,
+            year:
+              yearNumber,
           },
           {
             name,
@@ -284,14 +414,25 @@ exports.finalizeMonth = async (
       results.push(saved);
     }
 
+    // =====================================================
+    // 5. TRẢ KẾT QUẢ TOÀN TRƯỜNG
+    // =====================================================
+
     res.json({
       message:
-        `Đã chốt hạnh kiểm tháng ${monthNumber}/${yearNumber} cho lớp ${className}`,
-      count:
+        `Đã duyệt hạnh kiểm toàn trường tháng ${monthNumber}/${yearNumber}`,
+      month:
+        monthNumber,
+      year:
+        yearNumber,
+      weekNumbers:
+        monthWeekNumbers,
+      studentCount:
         results.length,
       data:
         results,
     });
+
   } catch (err) {
     console.error(
       "finalizeMonth error:",
@@ -301,9 +442,12 @@ exports.finalizeMonth = async (
     res.status(500).json({
       message:
         "Server error",
+      error:
+        err.message,
     });
   }
 };
+
 
 // =====================================================
 // LẤY HẠNH KIỂM THÁNG
