@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+
 const ClassAttendanceSummarySchema = new mongoose.Schema({
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
