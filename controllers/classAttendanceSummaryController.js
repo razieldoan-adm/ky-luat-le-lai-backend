@@ -16,7 +16,7 @@ function normalizeVietnamese(str = "") {
 }
 
 // ✅ Ghi nhận học sinh nghỉ học
-exports.recordAbsence = async (req, res) => {
+.recordAbsence = async (req, res) => {
   try {
     const {
       studentId,
@@ -78,7 +78,7 @@ exports.recordAbsence = async (req, res) => {
 };
 
 // ✅ Lấy danh sách nghỉ học theo ngày
-exports.getByDate = async (req, res) => {
+.getByDate = async (req, res) => {
   try {
     const { className, grade, date, search } = req.query;
     if (!className || !date) {
@@ -117,7 +117,7 @@ exports.getByDate = async (req, res) => {
 };
 
 // ✅ Lấy danh sách nghỉ học theo tuần
-exports.getByWeek = async (req, res) => {
+.getByWeek = async (req, res) => {
   try {
     const { className, grade, week, search } = req.query;
 
@@ -169,7 +169,7 @@ exports.getByWeek = async (req, res) => {
 };
 
 // ✅ Duyệt nghỉ có phép (route: /api/attendance/approve/:id)
-exports.approvePermission = async (req, res) => {
+.approvePermission = async (req, res) => {
   try {
     const { id } = req.params;
     const record = await Attendance.findById(id);
@@ -190,7 +190,7 @@ exports.approvePermission = async (req, res) => {
 };
 
 // ✅ Lấy danh sách nghỉ học không phép (route: /api/attendance/unexcused)
-exports.getUnexcusedAbsences = async (req, res) => {
+.getUnexcusedAbsences = async (req, res) => {
   try {
     const { className, weekNumber, startDate, endDate } = req.query;
     const filter = { permission: false };
@@ -222,7 +222,7 @@ exports.getUnexcusedAbsences = async (req, res) => {
 };
 
 // ✅ Xác nhận có phép (route: /api/attendance/confirm/:id)
-exports.confirmPermission = async (req, res) => {
+.confirmPermission = async (req, res) => {
   try {
     const { id } = req.params;
     const record = await Attendance.findById(id);
@@ -242,7 +242,7 @@ exports.confirmPermission = async (req, res) => {
   }
 };
 
-exports.deleteAttendanceRecord = async (req, res) => {
+.deleteAttendanceRecord = async (req, res) => {
   try {
     const { id } = req.params;
     const record = await Attendance.findByIdAndDelete(id);
@@ -256,7 +256,7 @@ exports.deleteAttendanceRecord = async (req, res) => {
 };
 
 // controllers/attendanceController.js
-exports.getWeeklyUnexcusedSummary = async (req, res) => {
+.getWeeklyUnexcusedSummary = async (req, res) => {
   try {
     const { weekNumber } = req.query;
     if (!weekNumber)
@@ -308,7 +308,7 @@ const absences = await Attendance.find({
 };
 
 // ✅ Lấy tất cả bản ghi nghỉ học của 1 học sinh
-exports.getAttendanceByStudent = async (req, res) => {
+.getAttendanceByStudent = async (req, res) => {
   try {
     const { studentId } = req.params;
     if (!studentId) {
@@ -327,7 +327,7 @@ exports.getAttendanceByStudent = async (req, res) => {
 };
 
 // ✅ (Tuỳ chọn) Thống kê nhanh tình hình chuyên cần
-exports.getStudentAttendanceSummary = async (req, res) => {
+.getStudentAttendanceSummary = async (req, res) => {
   try {
     const { studentId } = req.params;
     if (!studentId) {
@@ -355,7 +355,7 @@ exports.getStudentAttendanceSummary = async (req, res) => {
 // =====================================================
 // ĐÁNH DẤU / HỦY NGOẠI LỆ CHUYÊN CẦN
 // =====================================================
-exports.setAttendanceException = async (req, res) => {
+.setAttendanceException = async (req, res) => {
   try {
     const { id } = req.params;
     const { isException, exceptionNote } = req.body;
@@ -394,3 +394,104 @@ exports.setAttendanceException = async (req, res) => {
   }
 };
 
+// =====================================================
+// KIỂM TRA HỌC SINH NGHỈ LIÊN TỤC 3 NGÀY
+// =====================================================
+
+exports.checkConsecutiveAbsence = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+
+    if (!studentId) {
+      return res.status(400).json({
+        message: "Thiếu studentId",
+      });
+    }
+
+    const records = await Attendance.find({
+      studentId,
+    }).sort({
+      date: 1,
+      session: 1,
+    });
+
+    if (!records.length) {
+      return res.json({
+        hasConsecutive3Days: false,
+        records: [],
+      });
+    }
+
+    // Lấy danh sách ngày duy nhất
+    const uniqueDates = [
+      ...new Set(
+        records
+          .map((item) => String(item.date).trim())
+          .filter(Boolean)
+      ),
+    ].sort();
+
+    let currentDates = [];
+    let consecutiveDates = [];
+
+    for (let i = 0; i < uniqueDates.length; i++) {
+      const current = dayjs(uniqueDates[i]);
+
+      if (!current.isValid()) continue;
+
+      if (currentDates.length === 0) {
+        currentDates = [uniqueDates[i]];
+        continue;
+      }
+
+      const previous = dayjs(
+        currentDates[currentDates.length - 1]
+      );
+
+      const diff = current.diff(previous, "day");
+
+      if (diff === 1) {
+        currentDates.push(uniqueDates[i]);
+
+        if (currentDates.length >= 3) {
+          consecutiveDates = [...currentDates];
+        }
+      } else {
+        currentDates = [uniqueDates[i]];
+      }
+    }
+
+    if (consecutiveDates.length < 3) {
+      return res.json({
+        hasConsecutive3Days: false,
+        records: [],
+      });
+    }
+
+    // Lấy toàn bộ bản ghi của các ngày trong chuỗi liên tục
+    const consecutiveRecords = records.filter((record) =>
+      consecutiveDates.includes(
+        String(record.date).trim()
+      )
+    );
+
+    return res.json({
+      hasConsecutive3Days: true,
+      dates: consecutiveDates,
+      startDate: consecutiveDates[0],
+      endDate:
+        consecutiveDates[consecutiveDates.length - 1],
+      records: consecutiveRecords,
+    });
+  } catch (error) {
+    console.error(
+      "❌ Lỗi kiểm tra nghỉ liên tục 3 ngày:",
+      error
+    );
+
+    return res.status(500).json({
+      message:
+        "Lỗi server khi kiểm tra nghỉ liên tục 3 ngày.",
+    });
+  }
+};
