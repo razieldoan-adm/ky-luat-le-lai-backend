@@ -1,16 +1,66 @@
-// models/ClassAttendanceSummary.js
-const mongoose = require("mongoose");
-
 const ClassAttendanceSummarySchema = new mongoose.Schema({
-  studentId: { type: mongoose.Schema.Types.ObjectId, ref: "Student", required: true },
-  studentName: { type: String, required: true },
-  className: { type: String, required: true },
-  grade: { type: String, required: true },
-  date: { type: String, required: true }, // YYYY-MM-DD
-    // 🆕 Thêm trường này để lưu tuần được xác định tự động
-  weekNumber: { type: Number, required: true },
-  session: { type: String, enum: ["sáng", "chiều"], required: true },
-  permission: { type: Boolean, default: false }, // false = không phép
+  studentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Student",
+    required: true,
+  },
+
+  studentName: {
+    type: String,
+    required: true,
+  },
+
+  className: {
+    type: String,
+    required: true,
+  },
+
+  grade: {
+    type: String,
+    required: true,
+  },
+
+  date: {
+    type: String,
+    required: true,
+  },
+
+  weekNumber: {
+    type: Number,
+    required: true,
+  },
+
+  session: {
+    type: String,
+    enum: ["sáng", "chiều"],
+    required: true,
+  },
+
+  // false = nghỉ không phép
+  // true  = nghỉ có phép
+  permission: {
+    type: Boolean,
+    default: false,
+  },
+
+  // Đánh dấu trường hợp ngoại lệ
+  isException: {
+    type: Boolean,
+    default: false,
+  },
+
+  // Ghi chú lý do ngoại lệ
+  exceptionNote: {
+    type: String,
+    default: "",
+    trim: true,
+  },
+
+  // Đã được đưa vào xử lý hạnh kiểm hay chưa
+  conductReviewed: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 ClassAttendanceSummarySchema.index(
@@ -18,4 +68,7 @@ ClassAttendanceSummarySchema.index(
   { unique: true }
 );
 
-module.exports = mongoose.model("ClassAttendanceSummary", ClassAttendanceSummarySchema);
+module.exports = mongoose.model(
+  "ClassAttendanceSummary",
+  ClassAttendanceSummarySchema
+);
