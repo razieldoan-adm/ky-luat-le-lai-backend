@@ -25,6 +25,8 @@ router.get("/by-student/:studentId", attendanceController.getAttendanceByStudent
 // ✅ (Tuỳ chọn) Lấy thống kê tổng quan chuyên cần học sinh
 router.get("/by-student/:studentId/summary", attendanceController.getStudentAttendanceSummary);
 
+router.get("/consecutive/:studentId", attendanceController.checkConsecutiveAbsence);
+
 router.put("/exception/:id",attendanceController.setAttendanceException);
 
 module.exports = router;
