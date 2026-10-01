@@ -61,21 +61,7 @@ const ClassAttendanceSummarySchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-  isException: {
-  type: Boolean,
-  default: false,
-},
-
-exceptionNote: {
-  type: String,
-  default: "",
-  trim: true,
-},
-
-conductReviewed: {
-  type: Boolean,
-  default: false,
-},
+  
 });
 
 ClassAttendanceSummarySchema.index(
