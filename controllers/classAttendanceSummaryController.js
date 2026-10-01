@@ -26,8 +26,7 @@ exports.recordAbsence = async (req, res) => {
       date,
       session,
       permission,
-    } = req.body; = req.body;
-
+    } = req.body; 
     // 🔍 Kiểm tra dữ liệu đầu vào
     if (!studentId || !studentName || !className || !grade || !date || !session) {
       return res.status(400).json({ message: "Thiếu thông tin bắt buộc." });
