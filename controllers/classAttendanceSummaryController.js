@@ -18,7 +18,15 @@ function normalizeVietnamese(str = "") {
 // ✅ Ghi nhận học sinh nghỉ học
 exports.recordAbsence = async (req, res) => {
   try {
-    const { studentId, studentName, className, grade, date, session } = req.body;
+    const {
+      studentId,
+      studentName,
+      className,
+      grade,
+      date,
+      session,
+      permission,
+    } = req.body; = req.body;
 
     // 🔍 Kiểm tra dữ liệu đầu vào
     if (!studentId || !studentName || !className || !grade || !date || !session) {
@@ -47,8 +55,15 @@ exports.recordAbsence = async (req, res) => {
         grade,
         date,
         session,
-        permission: false, // mặc định là không phép
-        weekNumber: week ? week.weekNumber : 0, // nếu không tìm thấy tuần thì gán 0
+        permission: permission === true,
+        weekNumber: week ? week.weekNumber : 0,
+        
+        // Mặc định chưa phải ngoại lệ
+        isException: false,
+        exceptionNote: "",
+        
+        // Chưa đưa vào xử lý hạnh kiểm
+        conductReviewed: false,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
@@ -335,6 +350,48 @@ exports.getStudentAttendanceSummary = async (req, res) => {
   } catch (err) {
     console.error("❌ Lỗi thống kê chuyên cần:", err);
     res.status(500).json({ message: "Lỗi server khi thống kê chuyên cần" });
+  }
+};
+
+// =====================================================
+// ĐÁNH DẤU / HỦY NGOẠI LỆ CHUYÊN CẦN
+// =====================================================
+exports.setAttendanceException = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isException, exceptionNote } = req.body;
+
+    const record = await Attendance.findById(id);
+
+    if (!record) {
+      return res.status(404).json({
+        message: "Không tìm thấy bản ghi nghỉ học.",
+      });
+    }
+
+    record.isException = isException === true;
+    record.exceptionNote =
+      isException === true
+        ? String(exceptionNote || "").trim()
+        : "";
+
+    // Khi thay đổi ngoại lệ thì cho phép xét hạnh kiểm lại
+    record.conductReviewed = false;
+
+    await record.save();
+
+    return res.status(200).json({
+      message: record.isException
+        ? "Đã đánh dấu trường hợp ngoại lệ."
+        : "Đã hủy đánh dấu ngoại lệ.",
+      record,
+    });
+  } catch (error) {
+    console.error("❌ Lỗi xử lý ngoại lệ chuyên cần:", error);
+
+    return res.status(500).json({
+      message: "Lỗi server khi xử lý ngoại lệ chuyên cần.",
+    });
   }
 };
 
