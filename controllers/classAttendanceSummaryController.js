@@ -16,7 +16,7 @@ function normalizeVietnamese(str = "") {
 }
 
 // ✅ Ghi nhận học sinh nghỉ học
-.recordAbsence = async (req, res) => {
+exports.recordAbsence = async (req, res) => {
   try {
     const {
       studentId,
@@ -78,7 +78,7 @@ function normalizeVietnamese(str = "") {
 };
 
 // ✅ Lấy danh sách nghỉ học theo ngày
-.getByDate = async (req, res) => {
+exports.getByDate = async (req, res) => {
   try {
     const { className, grade, date, search } = req.query;
     if (!className || !date) {
@@ -117,7 +117,7 @@ function normalizeVietnamese(str = "") {
 };
 
 // ✅ Lấy danh sách nghỉ học theo tuần
-.getByWeek = async (req, res) => {
+exports.getByWeek = async (req, res) => {
   try {
     const { className, grade, week, search } = req.query;
 
@@ -169,7 +169,7 @@ function normalizeVietnamese(str = "") {
 };
 
 // ✅ Duyệt nghỉ có phép (route: /api/attendance/approve/:id)
-.approvePermission = async (req, res) => {
+exports.approvePermission = async (req, res) => {
   try {
     const { id } = req.params;
     const record = await Attendance.findById(id);
@@ -190,7 +190,7 @@ function normalizeVietnamese(str = "") {
 };
 
 // ✅ Lấy danh sách nghỉ học không phép (route: /api/attendance/unexcused)
-.getUnexcusedAbsences = async (req, res) => {
+exports.getUnexcusedAbsences = async (req, res) => {
   try {
     const { className, weekNumber, startDate, endDate } = req.query;
     const filter = { permission: false };
@@ -222,7 +222,7 @@ function normalizeVietnamese(str = "") {
 };
 
 // ✅ Xác nhận có phép (route: /api/attendance/confirm/:id)
-.confirmPermission = async (req, res) => {
+exports.confirmPermission = async (req, res) => {
   try {
     const { id } = req.params;
     const record = await Attendance.findById(id);
@@ -242,7 +242,7 @@ function normalizeVietnamese(str = "") {
   }
 };
 
-.deleteAttendanceRecord = async (req, res) => {
+exports.deleteAttendanceRecord = async (req, res) => {
   try {
     const { id } = req.params;
     const record = await Attendance.findByIdAndDelete(id);
@@ -256,7 +256,7 @@ function normalizeVietnamese(str = "") {
 };
 
 // controllers/attendanceController.js
-.getWeeklyUnexcusedSummary = async (req, res) => {
+exports.getWeeklyUnexcusedSummary = async (req, res) => {
   try {
     const { weekNumber } = req.query;
     if (!weekNumber)
@@ -308,7 +308,7 @@ const absences = await Attendance.find({
 };
 
 // ✅ Lấy tất cả bản ghi nghỉ học của 1 học sinh
-.getAttendanceByStudent = async (req, res) => {
+exports.getAttendanceByStudent = async (req, res) => {
   try {
     const { studentId } = req.params;
     if (!studentId) {
@@ -327,7 +327,7 @@ const absences = await Attendance.find({
 };
 
 // ✅ (Tuỳ chọn) Thống kê nhanh tình hình chuyên cần
-.getStudentAttendanceSummary = async (req, res) => {
+exports.getStudentAttendanceSummary = async (req, res) => {
   try {
     const { studentId } = req.params;
     if (!studentId) {
@@ -355,7 +355,7 @@ const absences = await Attendance.find({
 // =====================================================
 // ĐÁNH DẤU / HỦY NGOẠI LỆ CHUYÊN CẦN
 // =====================================================
-.setAttendanceException = async (req, res) => {
+exports.setAttendanceException = async (req, res) => {
   try {
     const { id } = req.params;
     const { isException, exceptionNote } = req.body;
