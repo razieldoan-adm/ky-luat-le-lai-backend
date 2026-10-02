@@ -14,7 +14,7 @@ const {
 // Lấy các vi phạm có thể nộp đơn
 router.get(
   "/eligible",
-  verifyToken,
+  
   controller.getEligibleViolations
 );
 
