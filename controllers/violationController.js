@@ -239,8 +239,27 @@ for (const violation of violations) {
   // MỖI LỖI N1-N5 = -1
   // ==========================================================
 
+  
+  // MỨC TRỪ LŨY KẾ CỦA NHÓM S1
+  const S1 = groupViolations.S1;
+
+  let seriousPenalty = 0;
+
+  if (S1 === 1) {
+    seriousPenalty = 11;
+  } else if (S1 === 2) {
+    seriousPenalty = 26;
+  } else if (S1 >= 3) {
+    seriousPenalty = 51;
+  }
+
+  // Mỗi lỗi nhóm N1-N5 trừ 1 điểm
+  const normalPenalty = totalConductViolations;
+
+  // Tổng điểm trừ = nhóm S + nhóm N
   const totalDeduction =
-    totalConductViolations;
+    seriousPenalty + normalPenalty;
+
 
   // ==========================================================
   // LẤY ĐIỂM TỐI ĐA
