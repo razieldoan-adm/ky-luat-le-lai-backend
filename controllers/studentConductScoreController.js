@@ -9,22 +9,30 @@ const Student = require('../models/Student');
  * N1-N5: mỗi lần = -1
  * S1: không trừ điểm
  */
-const calculateScore = (groupViolations) => {
-  const N1 = groupViolations.N1 || 0;
-  const N2 = groupViolations.N2 || 0;
-  const N3 = groupViolations.N3 || 0;
-  const N4 = groupViolations.N4 || 0;
-  const N5 = groupViolations.N5 || 0;
 
-  const totalConductViolations =
-    N1 + N2 + N3 + N4 + N5;
+const calculateScore = (groupViolations = {}) => {
+  const N1 = Math.max(0, Number(groupViolations.N1) || 0);
+  const N2 = Math.max(0, Number(groupViolations.N2) || 0);
+  const N3 = Math.max(0, Number(groupViolations.N3) || 0);
+  const N4 = Math.max(0, Number(groupViolations.N4) || 0);
+  const N5 = Math.max(0, Number(groupViolations.N5) || 0);
+  const S1 = Math.max(0, Number(groupViolations.S1) || 0);
 
-  const totalDeduction = totalConductViolations;
+  // Tổng số lỗi thông thường
+  const totalConductViolations = N1 + N2 + N3 + N4 + N5;
 
-  const finalScore = Math.max(
-    0,
-    100 - totalDeduction
-  );
+  // Mức trừ theo số lỗi nghiêm trọng
+  const seriousPenalty =
+    S1 === 0 ? 0 :
+    S1 === 1 ? 11 :
+    S1 === 2 ? 26 : 51;
+
+  // Mỗi lỗi thông thường trừ 1 điểm
+  const normalPenalty = totalConductViolations;
+
+  const totalDeduction = seriousPenalty + normalPenalty;
+
+  const finalScore = Math.max(0, 100 - totalDeduction);
 
   return {
     totalConductViolations,
