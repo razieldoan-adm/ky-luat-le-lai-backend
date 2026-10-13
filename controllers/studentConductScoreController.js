@@ -21,13 +21,18 @@ const calculateScore = (groupViolations = {}) => {
   // Tổng số lỗi thông thường
   const totalConductViolations = N1 + N2 + N3 + N4 + N5;
 
-  // Mức trừ theo số lỗi nghiêm trọng
-  const seriousPenalty =
-    S1 === 0 ? 0 :
-    S1 === 1 ? 11 :
-    S1 === 2 ? 26 : 51;
+  // Điểm trừ theo số lần vi phạm nghiêm trọng S1
+  let seriousPenalty = 0;
 
-  // Mỗi lỗi thông thường trừ 1 điểm
+  if (S1 === 1) {
+    seriousPenalty = 11;
+  } else if (S1 === 2) {
+    seriousPenalty = 26;
+  } else if (S1 >= 3) {
+    seriousPenalty = 51;
+  }
+
+  // Mỗi lỗi N1-N5 trừ 1 điểm
   const normalPenalty = totalConductViolations;
 
   const totalDeduction = seriousPenalty + normalPenalty;
@@ -40,7 +45,6 @@ const calculateScore = (groupViolations = {}) => {
     finalScore,
   };
 };
-
 
 /**
  * =====================================================
