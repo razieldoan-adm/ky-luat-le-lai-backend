@@ -30,66 +30,124 @@ exports.getAllRules = async (req, res) => {
  * TẠO RULE MỚI
  * ==========================================
  */
+  
 exports.createRule = async (req, res) => {
   try {
-    const {
+    const allowedGroups = ['N1', 'N2', 'N3', 'N4', 'N5', 'S1'];
+
+    const groupCode = String(req.body.groupCode || '')
+      .trim()
+      .toUpperCase();
+
+    const title = String(req.body.title || '').trim();
+    const point = Number(req.body.point);
+
+    if (!allowedGroups.includes(groupCode)) {
+      return res.status(400).json({
+        message: 'Mã nhóm không hợp lệ',
+      });
+    }
+
+    if (!title) {
+      return res.status(400).json({
+        message: 'Vui lòng nhập nội dung vi phạm',
+      });
+    }
+
+    if (
+      req.body.point === '' ||
+      req.body.point === null ||
+      req.body.point === undefined ||
+      !Number.isFinite(point)
+    ) {
+      return res.status(400).json({
+        message: 'Điểm trừ phải là một số hợp lệ',
+      });
+    }
+
+    // Lấy tên nhóm chuẩn từ nội quy hiện có trong MongoDB.
+    const existingGroup = await Rule.findOne({ groupCode })
+      .select('groupName')
+      .lean();
+
+    if (!existingGroup) {
+      return res.status(400).json({
+        message:
+          `Nhóm ${groupCode} chưa có nội quy để xác định tên nhóm. ` +
+          'Cần khai báo tên chuẩn cho nhóm này trước khi thêm.',
+      });
+    }
+
+    // Tìm tất cả mã đúng định dạng của nhóm đang chọn.
+    const escapedGroupCode = groupCode.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      '\\$&'
+    );
+
+    const codePattern = new RegExp(
+      `^${escapedGroupCode}-(\\d+)$`
+    );
+
+    const existingRules = await Rule.find({
       groupCode,
-      groupName,
+      ruleCode: {
+        $regex: `^${escapedGroupCode}-\\d+$`,
+      },
+    })
+      .select('ruleCode')
+      .lean();
+
+    let maxNumber = 0;
+
+    for (const rule of existingRules) {
+      const match = rule.ruleCode.match(codePattern);
+
+      if (match) {
+        maxNumber = Math.max(
+          maxNumber,
+          Number(match[1])
+        );
+      }
+    }
+
+    const nextNumber = maxNumber + 1;
+
+    // Giữ định dạng số có ít nhất 2 chữ số.
+    const ruleCode =
+      `${groupCode}-${String(nextNumber).padStart(2, '0')}`;
+
+    const newRule = new Rule({
+      groupCode,
+      groupName: existingGroup.groupName,
       ruleCode,
       title,
       point,
-      content,
-      active,
-    } = req.body;
-
-    // Kiểm tra dữ liệu bắt buộc
-    if (!groupCode || !groupName || !ruleCode || !title) {
-      return res.status(400).json({
-        message:
-          'Vui lòng nhập đầy đủ groupCode, groupName, ruleCode và title',
-      });
-    }
-
-    const normalizedGroupCode = String(groupCode)
-      .trim()
-      .toUpperCase();
-
-    const normalizedRuleCode = String(ruleCode)
-      .trim()
-      .toUpperCase();
-
-    // Kiểm tra mã lỗi trùng
-    const existed = await Rule.findOne({
-      ruleCode: normalizedRuleCode,
-    });
-
-    if (existed) {
-      return res.status(400).json({
-        message: `Mã lỗi ${normalizedRuleCode} đã tồn tại`,
-      });
-    }
-
-    const newRule = new Rule({
-      groupCode: normalizedGroupCode,
-      groupName: String(groupName).trim(),
-      ruleCode: normalizedRuleCode,
-      title: String(title).trim(),
-      point: Number(point) || 0,
-      content: content ? String(content).trim() : '',
-      active: active !== false,
+      content: 'điểm/hs',
+      active: true,
     });
 
     await newRule.save();
 
-    res.status(201).json(newRule);
+    return res.status(201).json(newRule);
   } catch (err) {
     console.error('createRule error:', err);
 
-    res.status(500).json({
-      message: 'Server error',
+    // Unique index vẫn bảo vệ dữ liệu khi có hai
+    // yêu cầu đồng thời nhận cùng một mã.
+    if (err.code === 11000) {
+      return res.status(409).json({
+        message:
+          'Mã nội quy vừa được tạo bởi một yêu cầu khác. ' +
+          'Vui lòng thử thêm lại.',
+      });
+    }
+
+    return res.status(500).json({
+      message: 'Không thể tạo nội quy',
     });
   }
 };
+
 
 
 /**
