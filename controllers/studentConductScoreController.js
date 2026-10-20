@@ -11,38 +11,48 @@ const Student = require('../models/Student');
  */
 
 const calculateScore = (groupViolations = {}) => {
-  const N1 = Math.max(0, Number(groupViolations.N1) || 0);
-  const N2 = Math.max(0, Number(groupViolations.N2) || 0);
-  const N3 = Math.max(0, Number(groupViolations.N3) || 0);
-  const N4 = Math.max(0, Number(groupViolations.N4) || 0);
-  const N5 = Math.max(0, Number(groupViolations.N5) || 0);
-  const S1 = Math.max(0, Number(groupViolations.S1) || 0);
+  const groups = Object.fromEntries(
+    Object.entries(groupViolations || {}).map(([code, count]) => [
+      String(code).trim().toUpperCase(),
+      Math.max(0, Number(count) || 0),
+    ])
+  );
 
-  // Tổng số lỗi thông thường
-  const totalConductViolations = N1 + N2 + N3 + N4 + N5;
+  // Nhóm N: mọi mã N có số phía sau đều trừ 1 điểm/lỗi.
+  const normalCodes = Object.keys(groups).filter((code) =>
+    /^N[1-9]\d*$/.test(code)
+  );
+  const totalConductViolations = normalCodes.reduce(
+    (sum, code) => sum + groups[code],
+    0
+  );
 
-  // Điểm trừ theo số lần vi phạm nghiêm trọng S1
-  let seriousPenalty = 0;
+  // Nhóm S: cộng chung tất cả mã S (S1, S2, S3...).
+  const seriousCodes = Object.keys(groups).filter((code) =>
+    /^S[1-9]\d*$/.test(code)
+  );
+  const seriousCount = seriousCodes.reduce(
+    (sum, code) => sum + groups[code],
+    0
+  );
 
-  if (S1 === 1) {
-    seriousPenalty = 11;
-  } else if (S1 === 2) {
-    seriousPenalty = 26;
-  } else if (S1 >= 3) {
-    seriousPenalty = 51;
-  }
+  const seriousPenalty =
+    seriousCount === 0 ? 0 :
+    seriousCount === 1 ? 11 :
+    seriousCount === 2 ? 26 : 51;
 
-  // Mỗi lỗi N1-N5 trừ 1 điểm
-  const normalPenalty = totalConductViolations;
-
-  const totalDeduction = seriousPenalty + normalPenalty;
-
+  const totalDeduction = totalConductViolations + seriousPenalty;
   const finalScore = Math.max(0, 100 - totalDeduction);
 
   return {
+    groupViolations: groups,
     totalConductViolations,
+    seriousCount,
+    seriousPenalty,
+    normalPenalty: totalConductViolations,
     totalDeduction,
     finalScore,
+    hasSeriousViolation: seriousCount > 0,
   };
 };
 
@@ -200,14 +210,7 @@ exports.getStudentScore = async (req, res) => {
 
         maxScore: 100,
 
-        groupViolations: {
-          N1: 0,
-          N2: 0,
-          N3: 0,
-          N4: 0,
-          N5: 0,
-          S1: 0,
-        },
+        groupViolations: {},
 
         totalConductViolations: 0,
         totalDeduction: 0,
@@ -294,17 +297,16 @@ exports.createOrUpdateScore = async (req, res) => {
       });
     }
 
-    const groups = {
-      N1: Number(groupViolations?.N1) || 0,
-      N2: Number(groupViolations?.N2) || 0,
-      N3: Number(groupViolations?.N3) || 0,
-      N4: Number(groupViolations?.N4) || 0,
-      N5: Number(groupViolations?.N5) || 0,
-      S1: Number(groupViolations?.S1) || 0,
-    };
+    const groups = Object.fromEntries(
+      Object.entries(groupViolations || {})
+        .map(([code, count]) => [
+          String(code).trim().toUpperCase(),
+          Math.max(0, Number(count) || 0),
+        ])
+        .filter(([code]) => /^[NS][1-9]\d*$/.test(code))
+    );
 
-    const calculated =
-      calculateScore(groups);
+    const calculated = calculateScore(groups);
 
     const score =
       await StudentConductScore.findOneAndUpdate(
@@ -334,7 +336,7 @@ exports.createOrUpdateScore = async (req, res) => {
             calculated.finalScore,
 
           hasSeriousViolation:
-            groups.S1 > 0,
+            calculated.hasSeriousViolation,
 
           status:
             status || 'DRAFT',
@@ -615,14 +617,7 @@ exports.finalizeClassWeek = async (req, res) => {
 
           weekNumber: week,
 
-          groupViolations: {
-            N1: 0,
-            N2: 0,
-            N3: 0,
-            N4: 0,
-            N5: 0,
-            S1: 0,
-          },
+          groupViolations: {},
 
           totalConductViolations: 0,
           totalDeduction: 0,
