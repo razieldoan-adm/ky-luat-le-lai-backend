@@ -118,6 +118,9 @@ const ensureWeeklyAutoS2 = async ({
     handlingMethod: "",
     handledBy: "",
     handlingNote: `${AUTO_S2_MARKER} Tự động gán do ${repeatedSameRule ? "cùng một nội quy vi phạm từ 3 lần" : "tổng số lỗi thường từ 5 lần"} trong tuần ${week}.`,
+    s2ReviewStatus: "PENDING",
+    s2ApprovedBy: "",
+    s2ApprovedAt: null,
     handled: false,
     weekNumber: week,
     time: new Date(),
@@ -273,6 +276,15 @@ if (violations.length > 0) {
   // ==========================================================
 
 for (const violation of violations) {
+
+  // S2 tự động đang chờ duyệt chỉ dùng để cảnh báo/xem xét.
+  // Chỉ tính vào điểm hạnh kiểm sau khi được duyệt chính thức.
+  const currentGroup = String(violation.groupCode || '').trim().toUpperCase();
+  const isAutoS2 = currentGroup === 'S2' &&
+    String(violation.handlingNote || '').includes(AUTO_S2_MARKER);
+  if (isAutoS2 && String(violation.s2ReviewStatus || 'PENDING').toUpperCase() !== 'APPROVED') {
+    continue;
+  }
 
   // ==========================================================
   // HẠNH KIỂM:
@@ -1654,6 +1666,117 @@ const beforeData = {
         "Lỗi server khi cập nhật vi phạm.",
       detail:
         error.message,
+    });
+  }
+};
+
+// ============================================================
+// ✅ DUYỆT HẠ S2 SAU KHI PGT ĐÃ XỬ LÝ TOÀN BỘ LỖI LIÊN QUAN
+// ============================================================
+exports.approveWeeklyS2Review = async (req, res) => {
+  try {
+    const { name, className, academicYear, weekNumber } = req.body || {};
+    const normalizedName = normalizeName(name);
+    const normalizedClass = normalizeClass(className);
+    const year = String(academicYear || '').trim();
+    const week = Number(weekNumber);
+
+    if (!normalizedName || !normalizedClass || !year || !Number.isInteger(week) || week < 1) {
+      return res.status(400).json({ message: 'Thiếu hoặc sai thông tin học sinh, lớp, năm học hoặc tuần.' });
+    }
+
+    await ensureWeeklyAutoS2({
+      name: normalizedName,
+      className: normalizedClass,
+      academicYear: year,
+      weekNumber: week,
+    });
+
+    const s2Violation = await Violation.findOne({
+      name: normalizedName,
+      className: normalizedClass,
+      academicYear: year,
+      weekNumber: week,
+      groupCode: 'S2',
+      handlingNote: { $regex: '\\[AUTO_S2_WEEKLY\\]' },
+    }).collation({ locale: 'en', strength: 2 });
+
+    if (!s2Violation) {
+      return res.status(404).json({
+        message: 'Không tìm thấy bản ghi S2 tự động. Hãy kiểm tra điều kiện xét và nội quy nhóm S2 đang hoạt động.',
+      });
+    }
+
+    if (String(s2Violation.s2ReviewStatus || '').toUpperCase() === 'APPROVED') {
+      return res.status(200).json({
+        message: 'Học sinh đã được duyệt hạ rèn luyện trước đó.',
+        alreadyApproved: true,
+        violation: s2Violation,
+      });
+    }
+
+    const relatedViolations = await Violation.find({
+      name: normalizedName,
+      className: normalizedClass,
+      academicYear: year,
+      weekNumber: week,
+      _id: { $ne: s2Violation._id },
+    }).collation({ locale: 'en', strength: 2 });
+
+    const notHandledByPGT = relatedViolations.filter(
+      (item) => item.handled !== true || String(item.handledBy || '').trim().toUpperCase() !== 'PGT'
+    );
+
+    if (notHandledByPGT.length > 0) {
+      return res.status(400).json({
+        message: `Chưa thể duyệt hạ rèn luyện: còn ${notHandledByPGT.length} lỗi liên quan chưa được PGT xử lý.`,
+        pendingCount: notHandledByPGT.length,
+        pendingViolations: notHandledByPGT.map((item) => ({
+          _id: item._id,
+          description: item.description,
+          handled: item.handled,
+          handledBy: item.handledBy,
+        })),
+      });
+    }
+
+    const beforeData = s2Violation.toObject();
+    s2Violation.s2ReviewStatus = 'APPROVED';
+    s2Violation.s2ApprovedBy = String(
+      req.user?.name || req.user?.username || req.user?.email || req.user?.id || 'PGT'
+    );
+    s2Violation.s2ApprovedAt = new Date();
+    s2Violation.handled = true;
+    s2Violation.handledBy = 'PGT';
+    s2Violation.handlingMethod = 'Đã duyệt hạ rèn luyện';
+    s2Violation.handlingNote = `${String(s2Violation.handlingNote || '').trim()} [ĐÃ DUYỆT S2]`.trim();
+    await s2Violation.save();
+
+    await createAuditLog({
+      req,
+      action: 'UPDATE',
+      module: 'VIOLATION',
+      targetId: s2Violation._id,
+      studentName: s2Violation.name,
+      className: s2Violation.className,
+      academicYear: s2Violation.academicYear,
+      weekNumber: s2Violation.weekNumber,
+      beforeData,
+      afterData: s2Violation.toObject(),
+    });
+
+    const conductScore = await updateStudentConductScore(normalizedName, normalizedClass, year, week);
+
+    return res.json({
+      message: 'Đã duyệt hạ rèn luyện S2 và cập nhật điểm hạnh kiểm.',
+      violation: s2Violation,
+      conductScore,
+    });
+  } catch (error) {
+    console.error('approveWeeklyS2Review error:', error);
+    return res.status(500).json({
+      message: 'Lỗi server khi duyệt hạ rèn luyện S2.',
+      detail: error.message,
     });
   }
 };
