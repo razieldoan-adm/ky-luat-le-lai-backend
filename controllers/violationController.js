@@ -1018,22 +1018,17 @@ exports.deleteViolation = async (req, res) => {
     // ==========================================================
     // 2. KIỂM TRA NHÓM
     // ==========================================================
+    // Chấp nhận các nhóm N/S được tạo động, ví dụ N1-N6, S1-S3...
+    // S2 là nhóm hệ thống dành riêng nhưng vẫn phải xóa được
+    // nếu đã tồn tại một vi phạm thuộc nhóm này.
+    // Không khóa danh sách nhóm tại N1-N5/S1 vì sẽ chặn nhóm mới.
+    // ==========================================================
 
-    const validGroups = [
-      "N1",
-      "N2",
-      "N3",
-      "N4",
-      "N5",
-      "S1",
-    ];
+    const isValidGroupCode = /^[NS][1-9][0-9]*$/.test(groupCode);
 
-    if (
-      !validGroups.includes(groupCode)
-    ) {
+    if (!isValidGroupCode) {
       return res.status(400).json({
-        message:
-          `groupCode không hợp lệ: ${groupCode}`,
+        message: `Mã nhóm vi phạm không hợp lệ: ${groupCode || "(trống)"}`,
       });
     }
 
