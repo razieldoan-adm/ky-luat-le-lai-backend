@@ -177,14 +177,7 @@ if (violations.length > 0) {
   // KHỞI TẠO BỘ ĐẾM
   // ==========================================================
 
-  const groupViolations = {
-    N1: 0,
-    N2: 0,
-    N3: 0,
-    N4: 0,
-    N5: 0,
-    S1: 0,
-  };
+  const groupViolations = {};
 
   // ==========================================================
   // ĐẾM TỪ VIOLATION
@@ -210,17 +203,10 @@ for (const violation of violations) {
     groupCode
   );
 
-  if (
-    [
-      "N1",
-      "N2",
-      "N3",
-      "N4",
-      "N5",
-      "S1",
-    ].includes(groupCode)
-  ) {
-    groupViolations[groupCode]++;
+  // Chấp nhận mọi mã nhóm N/S có số dương, ví dụ N6, S2, S3.
+  if (/^[NS][1-9]\d*$/.test(groupCode)) {
+    groupViolations[groupCode] =
+      (Number(groupViolations[groupCode]) || 0) + 1;
   }
 }
 
@@ -228,12 +214,13 @@ for (const violation of violations) {
   // TỔNG LỖI TÍNH HẠNH KIỂM
   // ==========================================================
 
-  const totalConductViolations =
-    groupViolations.N1 +
-    groupViolations.N2 +
-    groupViolations.N3 +
-    groupViolations.N4 +
-    groupViolations.N5;
+  const totalConductViolations = Object.entries(groupViolations)
+    .filter(([code]) => /^N[1-9]\d*$/.test(code))
+    .reduce((sum, [, count]) => sum + Number(count || 0), 0);
+
+  const seriousCount = Object.entries(groupViolations)
+    .filter(([code]) => /^S[1-9]\d*$/.test(code))
+    .reduce((sum, [, count]) => sum + Number(count || 0), 0);
 
   // ==========================================================
   // MỖI LỖI N1-N5 = -1
@@ -241,15 +228,13 @@ for (const violation of violations) {
 
   
   // MỨC TRỪ LŨY KẾ CỦA NHÓM S1
-  const S1 = groupViolations.S1;
-
   let seriousPenalty = 0;
 
-  if (S1 === 1) {
+  if (seriousCount === 1) {
     seriousPenalty = 11;
-  } else if (S1 === 2) {
+  } else if (seriousCount === 2) {
     seriousPenalty = 26;
-  } else if (S1 >= 3) {
+  } else if (seriousCount >= 3) {
     seriousPenalty = 51;
   }
 
@@ -288,7 +273,7 @@ for (const violation of violations) {
   // ==========================================================
 
   const hasSeriousViolation =
-    groupViolations.S1 > 0;
+    seriousCount > 0;
 
   console.log(
     "📊 KẾT QUẢ:",
@@ -1018,13 +1003,8 @@ exports.deleteViolation = async (req, res) => {
     // ==========================================================
     // 2. KIỂM TRA NHÓM
     // ==========================================================
-    // Chấp nhận các nhóm N/S được tạo động, ví dụ N1-N6, S1-S3...
-    // S2 là nhóm hệ thống dành riêng nhưng vẫn phải xóa được
-    // nếu đã tồn tại một vi phạm thuộc nhóm này.
-    // Không khóa danh sách nhóm tại N1-N5/S1 vì sẽ chặn nhóm mới.
-    // ==========================================================
 
-    const isValidGroupCode = /^[NS][1-9][0-9]*$/.test(groupCode);
+    const isValidGroupCode = /^[NS][1-9]\d*$/.test(groupCode);
 
     if (!isValidGroupCode) {
       return res.status(400).json({
