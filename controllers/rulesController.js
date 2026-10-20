@@ -1,124 +1,194 @@
 const Rule = require('../models/Rule');
+const RuleGroup = require('../models/RuleGroup');
 const xlsx = require('xlsx');
 
-/**
- * ==========================================
- * LẤY TOÀN BỘ RULE
- * ==========================================
- */
+const LEGACY_GROUPS = [
+  { groupCode: 'N1', groupName: 'Nhóm N1', systemManaged: true },
+  { groupCode: 'N2', groupName: 'Nhóm N2', systemManaged: true },
+  { groupCode: 'N3', groupName: 'Nhóm N3', systemManaged: true },
+  { groupCode: 'N4', groupName: 'Nhóm N4', systemManaged: true },
+  { groupCode: 'N5', groupName: 'Nhóm N5', systemManaged: true },
+  { groupCode: 'S1', groupName: 'Nhóm S1', systemManaged: true },
+];
+
+// Đếm mã lớn nhất đang có. Chỉ dùng để đồng bộ bộ đếm lần đầu;
+// sau đó nextRuleNumber chỉ tăng, không giảm khi xóa nội quy.
+function getRuleNumber(ruleCode, groupCode) {
+  const escaped = groupCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = String(ruleCode || '').match(
+    new RegExp(`^${escaped}-(\\d+)$`, 'i')
+  );
+  return match ? Number(match[1]) : 0;
+}
+
+async function ensureRuleGroups() {
+  const existingRules = await Rule.find({})
+    .select('groupCode groupName ruleCode')
+    .lean();
+
+  const groupsByCode = new Map();
+
+  for (const legacy of LEGACY_GROUPS) {
+    groupsByCode.set(legacy.groupCode, {
+      ...legacy,
+      maxRuleNumber: 0,
+    });
+  }
+
+  for (const rule of existingRules) {
+    const code = String(rule.groupCode || '').trim().toUpperCase();
+    if (!code) continue;
+
+    if (!groupsByCode.has(code)) {
+      groupsByCode.set(code, {
+        groupCode: code,
+        groupName: String(rule.groupName || code).trim() || code,
+        systemManaged: false,
+        maxRuleNumber: 0,
+      });
+    }
+
+    const item = groupsByCode.get(code);
+    item.maxRuleNumber = Math.max(
+      item.maxRuleNumber,
+      getRuleNumber(rule.ruleCode, code)
+    );
+    if (item.groupName === code && rule.groupName) {
+      item.groupName = String(rule.groupName).trim();
+    }
+  }
+
+  for (const item of groupsByCode.values()) {
+    const nextRuleNumber = item.maxRuleNumber + 1;
+    await RuleGroup.updateOne(
+      { groupCode: item.groupCode },
+      {
+        $setOnInsert: {
+          groupCode: item.groupCode,
+          groupName: item.groupName,
+          systemManaged: item.systemManaged,
+        },
+        // Chỉ đẩy bộ đếm lên; tuyệt đối không giảm để tái sử dụng mã cũ.
+        $max: { nextRuleNumber },
+      },
+      { upsert: true }
+    );
+  }
+}
+
 exports.getAllRules = async (req, res) => {
   try {
-    const rules = await Rule.find()
-      .sort({
-        groupCode: 1,
-        ruleCode: 1,
-      });
-
+    const rules = await Rule.find().sort({ groupCode: 1, ruleCode: 1 });
     res.json(rules);
   } catch (err) {
     console.error('getAllRules error:', err);
-
-    res.status(500).json({
-      message: 'Server error',
-    });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
+// Lấy danh sách nhóm để giao diện quản trị có thể hiển thị nhóm chưa có nội quy.
+exports.getRuleGroups = async (req, res) => {
+  try {
+    await ensureRuleGroups();
+    const groups = await RuleGroup.find().sort({ groupCode: 1 }).lean();
+    res.json(groups);
+  } catch (err) {
+    console.error('getRuleGroups error:', err);
+    res.status(500).json({ message: 'Không thể lấy danh sách nhóm nội quy' });
+  }
+};
 
-/**
- * ==========================================
- * TẠO RULE MỚI
- * ==========================================
- */
-  
+// Tạo nhóm mới. Nhóm tự tạo dùng mã N6, N7...; không cho tạo mã S tùy ý.
+exports.createRuleGroup = async (req, res) => {
+  try {
+    await ensureRuleGroups();
+
+    const groupName = String(req.body.groupName || '').trim();
+    if (!groupName) {
+      return res.status(400).json({ message: 'Vui lòng nhập tên nhóm nội quy' });
+    }
+
+    const existingGroups = await RuleGroup.find({
+      groupCode: { $regex: /^N\d+$/i },
+    }).select('groupCode').lean();
+
+    let maxNumber = 5;
+    for (const group of existingGroups) {
+      const match = String(group.groupCode).match(/^N(\d+)$/i);
+      if (match) maxNumber = Math.max(maxNumber, Number(match[1]));
+    }
+
+    const groupCode = `N${maxNumber + 1}`;
+    const group = await RuleGroup.create({
+      groupCode,
+      groupName,
+      systemManaged: false,
+      nextRuleNumber: 1,
+    });
+
+    return res.status(201).json(group);
+  } catch (err) {
+    console.error('createRuleGroup error:', err);
+    if (err.code === 11000) {
+      return res.status(409).json({
+        message: 'Mã nhóm vừa được tạo bởi yêu cầu khác. Vui lòng thử lại.',
+      });
+    }
+    return res.status(500).json({ message: 'Không thể tạo nhóm nội quy' });
+  }
+};
+
 exports.createRule = async (req, res) => {
   try {
-    const allowedGroups = ['N1', 'N2', 'N3', 'N4', 'N5', 'S1'];
+    await ensureRuleGroups();
 
-    const groupCode = String(req.body.groupCode || '')
-      .trim()
-      .toUpperCase();
-
+    const groupCode = String(req.body.groupCode || '').trim().toUpperCase();
     const title = String(req.body.title || '').trim();
     const point = Number(req.body.point);
 
-    if (!allowedGroups.includes(groupCode)) {
-      return res.status(400).json({
-        message: 'Mã nhóm không hợp lệ',
+    if (!groupCode) {
+      return res.status(400).json({ message: 'Vui lòng chọn nhóm nội quy' });
+    }
+    if (groupCode === 'S2') {
+      return res.status(403).json({
+        message: 'Nhóm S2 là nhóm hệ thống, không được tạo nội quy theo cách thông thường',
       });
     }
-
     if (!title) {
-      return res.status(400).json({
-        message: 'Vui lòng nhập nội dung vi phạm',
-      });
+      return res.status(400).json({ message: 'Vui lòng nhập nội dung vi phạm' });
     }
-
     if (
       req.body.point === '' ||
       req.body.point === null ||
       req.body.point === undefined ||
       !Number.isFinite(point)
     ) {
-      return res.status(400).json({
-        message: 'Điểm trừ phải là một số hợp lệ',
-      });
+      return res.status(400).json({ message: 'Điểm trừ phải là một số hợp lệ' });
     }
 
-    // Lấy tên nhóm chuẩn từ nội quy hiện có trong MongoDB.
-    const existingGroup = await Rule.findOne({ groupCode })
-      .select('groupName')
-      .lean();
-
-    if (!existingGroup) {
-      return res.status(400).json({
-        message:
-          `Nhóm ${groupCode} chưa có nội quy để xác định tên nhóm. ` +
-          'Cần khai báo tên chuẩn cho nhóm này trước khi thêm.',
-      });
+    const group = await RuleGroup.findOne({ groupCode });
+    if (!group) {
+      return res.status(400).json({ message: `Nhóm ${groupCode} không tồn tại` });
     }
 
-    // Tìm tất cả mã đúng định dạng của nhóm đang chọn.
-    const escapedGroupCode = groupCode.replace(
-      /[.*+?^${}()|[\]\\]/g,
-      '\\$&'
+    // Cấp số bằng thao tác nguyên tử. Nếu tạo Rule thất bại, số đã cấp vẫn bỏ qua,
+    // bảo đảm mã đã cấp không bị dùng lại.
+    const allocatedGroup = await RuleGroup.findOneAndUpdate(
+      { _id: group._id },
+      { $inc: { nextRuleNumber: 1 } },
+      { new: false }
     );
 
-    const codePattern = new RegExp(
-      `^${escapedGroupCode}-(\\d+)$`
-    );
-
-    const existingRules = await Rule.find({
-      groupCode,
-      ruleCode: {
-        $regex: `^${escapedGroupCode}-\\d+$`,
-      },
-    })
-      .select('ruleCode')
-      .lean();
-
-    let maxNumber = 0;
-
-    for (const rule of existingRules) {
-      const match = rule.ruleCode.match(codePattern);
-
-      if (match) {
-        maxNumber = Math.max(
-          maxNumber,
-          Number(match[1])
-        );
-      }
+    if (!allocatedGroup) {
+      return res.status(400).json({ message: 'Không thể cấp mã nội quy cho nhóm này' });
     }
 
-    const nextNumber = maxNumber + 1;
-
-    // Giữ định dạng số có ít nhất 2 chữ số.
     const ruleCode =
-      `${groupCode}-${String(nextNumber).padStart(2, '0')}`;
+      `${groupCode}-${String(allocatedGroup.nextRuleNumber).padStart(2, '0')}`;
 
     const newRule = new Rule({
       groupCode,
-      groupName: existingGroup.groupName,
+      groupName: group.groupName,
       ruleCode,
       title,
       point,
@@ -127,139 +197,73 @@ exports.createRule = async (req, res) => {
     });
 
     await newRule.save();
-
     return res.status(201).json(newRule);
   } catch (err) {
     console.error('createRule error:', err);
-
-    // Unique index vẫn bảo vệ dữ liệu khi có hai
-    // yêu cầu đồng thời nhận cùng một mã.
     if (err.code === 11000) {
       return res.status(409).json({
-        message:
-          'Mã nội quy vừa được tạo bởi một yêu cầu khác. ' +
-          'Vui lòng thử thêm lại.',
+        message: 'Mã nội quy bị trùng. Vui lòng thử tạo lại.',
       });
     }
-
-    return res.status(500).json({
-      message: 'Không thể tạo nội quy',
-    });
+    return res.status(500).json({ message: 'Không thể tạo nội quy' });
   }
 };
 
-
-
-/**
- * ==========================================
- * CẬP NHẬT RULE
- * ==========================================
- */
 exports.updateRule = async (req, res) => {
   try {
     const { id } = req.params;
+    const title = String(req.body.title || '').trim();
+    const point = Number(req.body.point);
 
-    const {
-      groupCode,
-      groupName,
-      ruleCode,
+    if (!title) {
+      return res.status(400).json({ message: 'Vui lòng nhập nội dung vi phạm' });
+    }
+    if (
+      req.body.point === '' ||
+      req.body.point === null ||
+      req.body.point === undefined ||
+      !Number.isFinite(point)
+    ) {
+      return res.status(400).json({ message: 'Điểm trừ phải là một số hợp lệ' });
+    }
+
+    // Chỉ cho sửa nội dung/điểm/trạng thái; không cho đổi mã nhóm hay mã nội quy.
+    const update = {
       title,
       point,
-      content,
-      active,
-    } = req.body;
+      content: req.body.content ? String(req.body.content).trim() : '',
+      active: req.body.active !== false,
+    };
 
-    // Kiểm tra dữ liệu bắt buộc
-    if (!groupCode || !groupName || !ruleCode || !title) {
-      return res.status(400).json({
-        message:
-          'Vui lòng nhập đầy đủ groupCode, groupName, ruleCode và title',
-      });
-    }
-
-    const normalizedGroupCode = String(groupCode)
-      .trim()
-      .toUpperCase();
-
-    const normalizedRuleCode = String(ruleCode)
-      .trim()
-      .toUpperCase();
-
-    // Kiểm tra mã lỗi có bị trùng với Rule khác không
-    const existed = await Rule.findOne({
-      ruleCode: normalizedRuleCode,
-      _id: { $ne: id },
+    const updated = await Rule.findByIdAndUpdate(id, update, {
+      new: true,
+      runValidators: true,
     });
 
-    if (existed) {
-      return res.status(400).json({
-        message: `Mã lỗi ${normalizedRuleCode} đã tồn tại`,
-      });
-    }
-
-    const updated = await Rule.findByIdAndUpdate(
-      id,
-      {
-        groupCode: normalizedGroupCode,
-        groupName: String(groupName).trim(),
-        ruleCode: normalizedRuleCode,
-        title: String(title).trim(),
-        point: Number(point) || 0,
-        content: content ? String(content).trim() : '',
-        active: active !== false,
-      },
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
-
     if (!updated) {
-      return res.status(404).json({
-        message: 'Không tìm thấy Rule',
-      });
+      return res.status(404).json({ message: 'Không tìm thấy nội quy' });
     }
-
     res.json(updated);
   } catch (err) {
     console.error('updateRule error:', err);
-
-    res.status(500).json({
-      message: 'Server error',
-    });
+    res.status(500).json({ message: 'Không thể cập nhật nội quy' });
   }
 };
 
-
-/**
- * ==========================================
- * XÓA RULE
- * ==========================================
- */
 exports.deleteRule = async (req, res) => {
   try {
     const { id } = req.params;
-
     const deleted = await Rule.findByIdAndDelete(id);
-
     if (!deleted) {
-      return res.status(404).json({
-        message: 'Không tìm thấy Rule',
-      });
+      return res.status(404).json({ message: 'Không tìm thấy nội quy' });
     }
-
-    res.json({
-      message: 'Deleted',
-    });
+    // Không giảm RuleGroup.nextRuleNumber khi xóa, nên mã cũ không được cấp lại.
+    res.json({ message: 'Đã xóa nội quy' });
   } catch (err) {
     console.error('deleteRule error:', err);
-
-    res.status(500).json({
-      message: 'Server error',
-    });
+    res.status(500).json({ message: 'Không thể xóa nội quy' });
   }
 };
-
 
 /**
  * ==========================================
@@ -484,9 +488,10 @@ exports.importRules = async (req, res) => {
     const insertedRules =
       await Rule.insertMany(rules);
 
+    await ensureRuleGroups();
+
     res.json({
-      message:
-        'Import nội quy thành công',
+      message: 'Import nội quy thành công',
       count: insertedRules.length,
     });
   } catch (err) {
