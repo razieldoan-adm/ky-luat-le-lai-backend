@@ -2,190 +2,44 @@ const mongoose = require('mongoose');
 
 const violationSchema = new mongoose.Schema(
   {
-    // ==========================================
-    // HỌC SINH
-    // ==========================================
+    name: { type: String, required: true },
+    className: { type: String, required: true },
+    academicYear: { type: String, required: true, trim: true },
 
-    name: {
+    groupCode: { type: String, required: true, trim: true, uppercase: true },
+    groupName: { type: String, default: '', trim: true },
+    ruleCode: { type: String, required: true, trim: true, uppercase: true },
+    description: { type: String, default: '' },
+    penalty: { type: Number, default: 0 },
+
+    handlingMethod: { type: String, default: '' },
+    handled: { type: Boolean, default: false },
+    handledBy: { type: String, enum: ['GVCN', 'PGT', ''], default: '' },
+    handlingNote: { type: String, default: '' },
+
+    // Chỉ dùng cho bản ghi S2 tự động; vi phạm thông thường không cần duyệt.
+    s2ReviewStatus: {
       type: String,
-      required: true,
+      enum: ['NOT_APPLICABLE', 'PENDING', 'APPROVED'],
+      default: 'NOT_APPLICABLE',
     },
+    s2ApprovedBy: { type: String, default: '' },
+    s2ApprovedAt: { type: Date, default: null },
 
-    className: {
-      type: String,
-      required: true,
-    },
-      academicYear: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    // ==========================================
-    // NHÓM LỖI - CBB1
-    //
-    // N1 -> N5: tính điểm hạnh kiểm
-    // S1: đặc biệt nghiêm trọng
-    // ==========================================
-  
-    groupCode: {
-      type: String,
-      required: true,
-      trim: true,
-      uppercase: true,
-    },
+    weekNumber: { type: Number, required: true },
+    time: { type: Date, default: Date.now },
 
-    groupName: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-
-    // ==========================================
-    // MÃ LỖI - CBB2
-    //
-    // Ví dụ:
-    // N1-01
-    // N2-05
-    // S1-01
-    // ==========================================
-
-    ruleCode: {
-      type: String,
-      required: true,
-      trim: true,
-      uppercase: true,
-    },
-
-    // ==========================================
-    // NỘI DUNG LỖI
-    // ==========================================
-
-    description: {
-      type: String,
-      default: '',
-    },
-
-    // ==========================================
-    // ĐIỂM TRỪ THI ĐUA LỚP
-    //
-    // Lấy theo Rule.point
-    //
-    // Ví dụ:
-    // Rule.point = 5
-    // → lớp bị trừ 5 điểm
-    // ==========================================
-
-    penalty: {
-      type: Number,
-      default: 0,
-    },
-
-    // ==========================================
-    // HÌNH THỨC XỬ LÝ
-    // ==========================================
-
-    handlingMethod: {
-      type: String,
-      default: '',
-    },
-
-    // ==========================================
-    // ĐÃ XỬ LÝ HAY CHƯA
-    // ==========================================
-
-    handled: {
-      type: Boolean,
-      default: false,
-    },
-
-    // ==========================================
-    // NGƯỜI XỬ LÝ
-    // ==========================================
-
-    handledBy: {
-      type: String,
-      enum: ['GVCN', 'PGT', ''],
-      default: '',
-    },
-
-    // ==========================================
-    // GHI CHÚ XỬ LÝ
-    // ==========================================
-
-    handlingNote: {
-      type: String,
-      default: '',
-    },
-
-    // ==========================================
-    // TUẦN HỌC
-    // ==========================================
-
-    weekNumber: {
-      type: Number,
-      required: true,
-    },
-
-    // ==========================================
-    // THỜI GIAN VI PHẠM
-    // ==========================================
-
-    time: {
-      type: Date,
-      default: Date.now,
-    },
-     
-      // ==========================================
-      // HÌNH ẢNH VI PHẠM
-      // Lưu thông tin tham chiếu Google Drive
-      // Không lưu file ảnh trực tiếp trong MongoDB
-      // ==========================================
-
-      images: [
-        {
-          fileId: {
-            type: String,
-            default: '',
-          },
-          url: {
-            type: String,
-            default: '',
-          },
-        },
-      ],
-   },
-      {
-        timestamps: true,
-      }
-    );
-
-// ==========================================
-// INDEX
-// ==========================================
-
-// Tìm lỗi theo học sinh + tuần
-violationSchema.index({
-  name: 1,
-  className: 1,
-  weekNumber: 1,
-});
-
-// Tìm lỗi theo nhóm
-violationSchema.index({
-  groupCode: 1,
-  academicYear: 1,
-  weekNumber: 1,
- 
-});
-
-// Tìm lỗi theo mã lỗi
-violationSchema.index({
-  ruleCode: 1,
-  academicYear: 1,
-  weekNumber: 1,
-});
-
-module.exports = mongoose.model(
-  'Violation',
-  violationSchema
+    images: [{
+      fileId: { type: String, default: '' },
+      url: { type: String, default: '' },
+    }],
+  },
+  { timestamps: true }
 );
+
+violationSchema.index({ name: 1, className: 1, weekNumber: 1 });
+violationSchema.index({ groupCode: 1, academicYear: 1, weekNumber: 1 });
+violationSchema.index({ ruleCode: 1, academicYear: 1, weekNumber: 1 });
+violationSchema.index({ name: 1, className: 1, academicYear: 1, weekNumber: 1, groupCode: 1 });
+
+module.exports = mongoose.model('Violation', violationSchema);
