@@ -48,18 +48,28 @@ async function ensureRuleGroups() {
       });
     }
 
-    const item = groupsByCode.get(code);
+      const item = groupsByCode.get(code);
     item.maxRuleNumber = Math.max(
       item.maxRuleNumber,
       getRuleNumber(rule.ruleCode, code)
     );
-    if (item.groupName === code && rule.groupName) {
+
+    // Với nhóm cũ N1-N5/S1, lấy tên thật từ nội quy đang lưu.
+    // Không tự ghi đè tên các nhóm N6/S3... đã do quản trị viên đặt.
+    const isLegacyGroup = LEGACY_GROUPS.some(
+      (legacy) => legacy.groupCode === code
+    );
+    if (rule.groupName && (isLegacyGroup || item.groupName === code)) {
       item.groupName = String(rule.groupName).trim();
     }
   }
 
-  for (const item of groupsByCode.values()) {
+for (const item of groupsByCode.values()) {
     const nextRuleNumber = item.maxRuleNumber + 1;
+    const isLegacyGroup = LEGACY_GROUPS.some(
+      (legacy) => legacy.groupCode === item.groupCode
+    );
+
     await RuleGroup.updateOne(
       { groupCode: item.groupCode },
       {
@@ -68,11 +78,19 @@ async function ensureRuleGroups() {
           groupName: item.groupName,
           systemManaged: item.systemManaged,
         },
-        // Chỉ đẩy bộ đếm lên; tuyệt đối không giảm để tái sử dụng mã cũ.
         $max: { nextRuleNumber },
       },
       { upsert: true }
     );
+
+    // Cập nhật tên chuẩn cho nhóm cũ từ Rule nếu có tên thật.
+    // Không thay tên nhóm do người quản trị tự đặt ở N6/S3 trở đi.
+    if (isLegacyGroup && item.groupName) {
+      await RuleGroup.updateOne(
+        { groupCode: item.groupCode },
+        { $set: { groupName: item.groupName } }
+      );
+    }
   }
 }
 
@@ -104,21 +122,42 @@ exports.createRuleGroup = async (req, res) => {
     await ensureRuleGroups();
 
     const groupName = String(req.body.groupName || '').trim();
+    const groupPrefix = String(req.body.groupPrefix || 'N')
+      .trim()
+      .toUpperCase();
+
     if (!groupName) {
-      return res.status(400).json({ message: 'Vui lòng nhập tên nhóm nội quy' });
+      return res.status(400).json({
+        message: 'Vui lòng nhập tên nhóm nội quy',
+      });
+    }
+
+    if (!['N', 'S'].includes(groupPrefix)) {
+      return res.status(400).json({
+        message: 'Loại mã nhóm chỉ được là N hoặc S',
+      });
     }
 
     const existingGroups = await RuleGroup.find({
-      groupCode: { $regex: /^N\d+$/i },
-    }).select('groupCode').lean();
+      groupCode: { $regex: `^${groupPrefix}\\d+$`, $options: 'i' },
+    })
+      .select('groupCode')
+      .lean();
 
-    let maxNumber = 5;
+    // N1-N5 và S1-S2 được dành riêng; không cấp lại các mã này.
+    let maxNumber = groupPrefix === 'N' ? 5 : 2;
+
     for (const group of existingGroups) {
-      const match = String(group.groupCode).match(/^N(\d+)$/i);
-      if (match) maxNumber = Math.max(maxNumber, Number(match[1]));
+      const match = String(group.groupCode).match(
+        new RegExp(`^${groupPrefix}(\\d+)$`, 'i')
+      );
+      if (match) {
+        maxNumber = Math.max(maxNumber, Number(match[1]));
+      }
     }
 
-    const groupCode = `N${maxNumber + 1}`;
+    const groupCode = `${groupPrefix}${maxNumber + 1}`;
+
     const group = await RuleGroup.create({
       groupCode,
       groupName,
@@ -129,12 +168,17 @@ exports.createRuleGroup = async (req, res) => {
     return res.status(201).json(group);
   } catch (err) {
     console.error('createRuleGroup error:', err);
+
     if (err.code === 11000) {
       return res.status(409).json({
-        message: 'Mã nhóm vừa được tạo bởi yêu cầu khác. Vui lòng thử lại.',
+        message:
+          'Mã nhóm vừa được tạo bởi một yêu cầu khác. Vui lòng tải lại danh sách rồi thử lại.',
       });
     }
-    return res.status(500).json({ message: 'Không thể tạo nhóm nội quy' });
+
+    return res.status(500).json({
+      message: 'Không thể tạo nhóm nội quy',
+    });
   }
 };
 
