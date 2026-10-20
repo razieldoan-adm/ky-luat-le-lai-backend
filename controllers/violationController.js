@@ -39,6 +39,95 @@ const getRuleByDescription = async (description) => {
 };
 
 // ============================================================
+// TỰ ĐỘNG GÁN LỖI S2 KHI HỌC SINH VI PHẠM LẶP LẠI TRONG TUẦN
+// Điều kiện: cùng một rule >= 3 lần HOẶC tổng lỗi thường >= 5 lần.
+// Tạo tối đa 1 lỗi S2 tự động / học sinh / lớp / năm học / tuần.
+// ============================================================
+const AUTO_S2_MARKER = "[AUTO_S2_WEEKLY]";
+
+const ensureWeeklyAutoS2 = async ({
+  name,
+  className,
+  academicYear,
+  weekNumber,
+}) => {
+  const studentName = normalizeName(name);
+  const studentClass = normalizeClass(className);
+  const year = String(academicYear || "").trim();
+  const week = Number(weekNumber);
+
+  if (!studentName || !studentClass || !year || !Number.isInteger(week)) {
+    return null;
+  }
+
+  // Chỉ tính các lỗi thường N*. Không tính các lỗi S* (kể cả S2 tự động)
+  // để tránh lỗi S2 tự làm tăng tổng số lỗi và tạo vòng lặp.
+  const weeklyViolations = await Violation.find({
+    name: studentName,
+    className: studentClass,
+    academicYear: year,
+    weekNumber: week,
+  }).select("ruleCode groupCode description handlingNote");
+
+  const normalViolations = weeklyViolations.filter((item) => {
+    const code = String(item.groupCode || "").trim().toUpperCase();
+    return /^N[1-9]\d*$/.test(code);
+  });
+
+  const countsByRule = new Map();
+  for (const item of normalViolations) {
+    const key = String(item.ruleCode || item.description || "").trim().toUpperCase();
+    if (!key) continue;
+    countsByRule.set(key, (countsByRule.get(key) || 0) + 1);
+  }
+
+  const repeatedSameRule = [...countsByRule.values()].some((count) => count >= 3);
+  const totalNormalViolations = normalViolations.length;
+  if (!repeatedSameRule && totalNormalViolations < 5) return null;
+
+  // Chống tạo trùng khi người dùng ghi nhận lỗi hoặc chạy tính lại nhiều lần.
+  const alreadyCreated = await Violation.findOne({
+    name: studentName,
+    className: studentClass,
+    academicYear: year,
+    weekNumber: week,
+    groupCode: "S2",
+    handlingNote: { $regex: "\\[AUTO_S2_WEEKLY\\]" },
+  });
+  if (alreadyCreated) return alreadyCreated;
+
+  const s2Rule = await Rule.findOne({
+    groupCode: "S2",
+    active: { $ne: false },
+  });
+
+  // Không tự tạo dữ liệu sai nếu quản trị viên chưa khai báo nội quy S2.
+  if (!s2Rule) {
+    console.warn("⚠️ Chưa có nội quy nhóm S2 đang hoạt động; bỏ qua tự động gán S2.");
+    return null;
+  }
+
+  const autoS2 = new Violation({
+    name: studentName,
+    className: studentClass,
+    description: s2Rule.title,
+    ruleCode: s2Rule.ruleCode,
+    groupCode: "S2",
+    academicYear: year,
+    penalty: typeof s2Rule.point === "number" ? s2Rule.point : 0,
+    handlingMethod: "",
+    handledBy: "",
+    handlingNote: `${AUTO_S2_MARKER} Tự động gán do ${repeatedSameRule ? "cùng một nội quy vi phạm từ 3 lần" : "tổng số lỗi thường từ 5 lần"} trong tuần ${week}.`,
+    handled: false,
+    weekNumber: week,
+    time: new Date(),
+  });
+
+  await autoS2.save();
+  return autoS2;
+};
+
+// ============================================================
 // TÌM GROUP CODE CỦA VIOLATION
 // ============================================================
 
@@ -690,6 +779,32 @@ exports.createViolation = async (req, res) => {
       });
 
     await violation.save();
+
+    // ========================================================
+    // ⭐ XÉT ĐIỀU KIỆN TỰ ĐỘNG GÁN LỖI S2 THEO TUẦN
+    // ========================================================
+    const autoS2Violation = await ensureWeeklyAutoS2({
+      name,
+      className: normalizedClass,
+      academicYear: String(academicYear).trim(),
+      weekNumber: week,
+    });
+
+    if (autoS2Violation) {
+      await createAuditLog({
+        req,
+        action: "CREATE",
+        module: "VIOLATION",
+        targetId: autoS2Violation._id,
+        studentName: autoS2Violation.name,
+        className: autoS2Violation.className,
+        academicYear: autoS2Violation.academicYear,
+        weekNumber: autoS2Violation.weekNumber,
+        beforeData: null,
+        afterData: autoS2Violation.toObject(),
+      });
+    }
+
     // ========================================================
     // 📝 GHI LỊCH SỬ THÊM VI PHẠM
     // ========================================================
@@ -734,6 +849,7 @@ exports.createViolation = async (req, res) => {
 
     res.status(201).json({
       violation,
+      autoS2Violation,
       conductScore,
     });
   } catch (error) {
