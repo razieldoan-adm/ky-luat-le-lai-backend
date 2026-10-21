@@ -861,7 +861,6 @@ exports.createViolation = async (req, res) => {
 
     res.status(201).json({
       violation,
-      autoS2Violation,
       conductScore,
     });
   } catch (error) {
@@ -1673,65 +1672,89 @@ const beforeData = {
 // ============================================================
 // ✅ DUYỆT HẠ S2 SAU KHI PGT ĐÃ XỬ LÝ TOÀN BỘ LỖI LIÊN QUAN
 // ============================================================
+
+// ============================================================
+// DUYỆT HẠ RÈN LUYỆN S2
+// Chỉ tạo S2 sau khi người dùng bấm duyệt và mọi lỗi liên quan
+// đã được PGT xử lý.
+// ============================================================
 exports.approveWeeklyS2Review = async (req, res) => {
   try {
     const { name, className, academicYear, weekNumber } = req.body || {};
+
     const normalizedName = normalizeName(name);
     const normalizedClass = normalizeClass(className);
     const year = String(academicYear || '').trim();
     const week = Number(weekNumber);
 
-    if (!normalizedName || !normalizedClass || !year || !Number.isInteger(week) || week < 1) {
-      return res.status(400).json({ message: 'Thiếu hoặc sai thông tin học sinh, lớp, năm học hoặc tuần.' });
-    }
-
-    await ensureWeeklyAutoS2({
-      name: normalizedName,
-      className: normalizedClass,
-      academicYear: year,
-      weekNumber: week,
-    });
-
-    const s2Violation = await Violation.findOne({
-      name: normalizedName,
-      className: normalizedClass,
-      academicYear: year,
-      weekNumber: week,
-      groupCode: 'S2',
-      handlingNote: { $regex: '\\[AUTO_S2_WEEKLY\\]' },
-    }).collation({ locale: 'en', strength: 2 });
-
-    if (!s2Violation) {
-      return res.status(404).json({
-        message: 'Không tìm thấy bản ghi S2 tự động. Hãy kiểm tra điều kiện xét và nội quy nhóm S2 đang hoạt động.',
+    if (
+      !normalizedName ||
+      !normalizedClass ||
+      !year ||
+      !Number.isInteger(week) ||
+      week < 1
+    ) {
+      return res.status(400).json({
+        message: 'Thiếu hoặc sai thông tin học sinh, lớp, năm học hoặc tuần.',
       });
     }
 
-    if (String(s2Violation.s2ReviewStatus || '').toUpperCase() === 'APPROVED') {
-      return res.status(200).json({
-        message: 'Học sinh đã được duyệt hạ rèn luyện trước đó.',
-        alreadyApproved: true,
-        violation: s2Violation,
-      });
-    }
-
-    const relatedViolations = await Violation.find({
+    // 1. Lấy toàn bộ vi phạm của học sinh trong đúng tuần.
+    const weeklyViolations = await Violation.find({
       name: normalizedName,
       className: normalizedClass,
       academicYear: year,
       weekNumber: week,
-      _id: { $ne: s2Violation._id },
     }).collation({ locale: 'en', strength: 2 });
 
-    const notHandledByPGT = relatedViolations.filter(
-      (item) => item.handled !== true || String(item.handledBy || '').trim().toUpperCase() !== 'PGT'
+    // 2. Chỉ xét lỗi nhóm N để xác định điều kiện S2.
+    const normalViolations = weeklyViolations.filter((item) =>
+      /^N[1-9]\d*$/.test(
+        String(item.groupCode || '').trim().toUpperCase()
+      )
     );
 
-    if (notHandledByPGT.length > 0) {
+    const countsByRule = new Map();
+
+    for (const item of normalViolations) {
+      const code = String(item.ruleCode || '').trim().toUpperCase();
+      if (!code) continue;
+
+      countsByRule.set(code, (countsByRule.get(code) || 0) + 1);
+    }
+
+    const repeatedSameRule = [...countsByRule.values()].some(
+      (count) => count >= 3
+    );
+
+    const totalNormalViolations = normalViolations.length;
+
+    if (!repeatedSameRule && totalNormalViolations < 5) {
       return res.status(400).json({
-        message: `Chưa thể duyệt hạ rèn luyện: còn ${notHandledByPGT.length} lỗi liên quan chưa được PGT xử lý.`,
-        pendingCount: notHandledByPGT.length,
-        pendingViolations: notHandledByPGT.map((item) => ({
+        message:
+          'Học sinh chưa đủ điều kiện xem xét S2: cần cùng một nội quy từ 3 lần hoặc tổng số lỗi nhóm N từ 5 lần trong cùng tuần.',
+      });
+    }
+
+    // 3. Kiểm tra các lỗi liên quan đã được PGT xử lý hết chưa.
+    // Không đưa bản ghi S2 cũ vào danh sách lỗi cần xử lý.
+    const relatedViolations = weeklyViolations.filter(
+      (item) =>
+        String(item.groupCode || '').trim().toUpperCase() !== 'S2'
+    );
+
+    const pendingViolations = relatedViolations.filter(
+      (item) =>
+        item.handled !== true ||
+        String(item.handledBy || '').trim().toUpperCase() !== 'PGT'
+    );
+
+    if (pendingViolations.length > 0) {
+      return res.status(400).json({
+        message:
+          `Chưa thể duyệt hạ rèn luyện: còn ${pendingViolations.length} lỗi liên quan chưa được PGT xử lý.`,
+        pendingCount: pendingViolations.length,
+        pendingViolations: pendingViolations.map((item) => ({
           _id: item._id,
           description: item.description,
           handled: item.handled,
@@ -1740,21 +1763,99 @@ exports.approveWeeklyS2Review = async (req, res) => {
       });
     }
 
-    const beforeData = s2Violation.toObject();
-    s2Violation.s2ReviewStatus = 'APPROVED';
-    s2Violation.s2ApprovedBy = String(
-      req.user?.name || req.user?.username || req.user?.email || req.user?.id || 'PGT'
+    // 4. Tìm nội quy hệ thống S2-01.
+    const s2Rule = await Rule.findOne({
+      groupCode: 'S2',
+      ruleCode: 'S2-01',
+      active: { $ne: false },
+    });
+
+    if (!s2Rule) {
+      return res.status(400).json({
+        message:
+          'Chưa có nội quy S2-01 đang hoạt động. Vui lòng kiểm tra dữ liệu nội quy.',
+      });
+    }
+
+    // 5. Chống duyệt hoặc tạo S2 trùng.
+    const existingS2 = weeklyViolations.find(
+      (item) =>
+        String(item.groupCode || '').trim().toUpperCase() === 'S2' &&
+        (
+          String(item.ruleCode || '').trim().toUpperCase() === 'S2-01' ||
+          String(item.handlingNote || '').includes('[AUTO_S2_WEEKLY]')
+        )
     );
+
+    if (
+      existingS2 &&
+      String(existingS2.s2ReviewStatus || '').toUpperCase() === 'APPROVED'
+    ) {
+      return res.status(200).json({
+        message: 'Học sinh đã được duyệt hạ rèn luyện trước đó.',
+        alreadyApproved: true,
+        violation: existingS2,
+      });
+    }
+
+    const approvedBy = String(
+      req.user?.name ||
+      req.user?.username ||
+      req.user?.email ||
+      req.user?.id ||
+      'PGT'
+    );
+
+    let s2Violation;
+    let beforeData = null;
+    let action = 'CREATE';
+
+    // Nếu còn bản ghi S2 chờ duyệt do phiên bản cũ tạo ra,
+    // chỉ hoàn tất bản ghi đó sau khi kiểm tra đủ điều kiện.
+    if (existingS2) {
+      s2Violation = existingS2;
+      beforeData = existingS2.toObject();
+      action = 'UPDATE';
+    } else {
+      // Quan trọng: chỉ tạo bản ghi tại thời điểm bấm duyệt.
+      s2Violation = new Violation({
+        name: normalizedName,
+        className: normalizedClass,
+        academicYear: year,
+        weekNumber: week,
+        time: new Date(),
+        groupCode: 'S2',
+        groupName: s2Rule.groupName || 'Tái vi phạm nhiều lần',
+        ruleCode: s2Rule.ruleCode,
+        description: s2Rule.title,
+        penalty: 0,
+        handlingMethod: 'Đã duyệt hạ rèn luyện',
+        handled: true,
+        handledBy: 'PGT',
+        handlingNote: '[AUTO_S2_WEEKLY] [ĐÃ DUYỆT S2]',
+      });
+    }
+
+    s2Violation.s2ReviewStatus = 'APPROVED';
+    s2Violation.s2ApprovedBy = approvedBy;
     s2Violation.s2ApprovedAt = new Date();
     s2Violation.handled = true;
     s2Violation.handledBy = 'PGT';
     s2Violation.handlingMethod = 'Đã duyệt hạ rèn luyện';
-    s2Violation.handlingNote = `${String(s2Violation.handlingNote || '').trim()} [ĐÃ DUYỆT S2]`.trim();
+
+    if (!String(s2Violation.handlingNote || '').includes('[AUTO_S2_WEEKLY]')) {
+      s2Violation.handlingNote =
+        '[AUTO_S2_WEEKLY] [ĐÃ DUYỆT S2]';
+    } else if (!String(s2Violation.handlingNote).includes('[ĐÃ DUYỆT S2]')) {
+      s2Violation.handlingNote =
+        `${s2Violation.handlingNote} [ĐÃ DUYỆT S2]`.trim();
+    }
+
     await s2Violation.save();
 
     await createAuditLog({
       req,
-      action: 'UPDATE',
+      action,
       module: 'VIOLATION',
       targetId: s2Violation._id,
       studentName: s2Violation.name,
@@ -1765,15 +1866,22 @@ exports.approveWeeklyS2Review = async (req, res) => {
       afterData: s2Violation.toObject(),
     });
 
-    const conductScore = await updateStudentConductScore(normalizedName, normalizedClass, year, week);
+    // 6. Tính lại điểm sau khi S2 được duyệt chính thức.
+    const conductScore = await updateStudentConductScore(
+      normalizedName,
+      normalizedClass,
+      year,
+      week
+    );
 
-    return res.json({
+    return res.status(200).json({
       message: 'Đã duyệt hạ rèn luyện S2 và cập nhật điểm hạnh kiểm.',
       violation: s2Violation,
       conductScore,
     });
   } catch (error) {
     console.error('approveWeeklyS2Review error:', error);
+
     return res.status(500).json({
       message: 'Lỗi server khi duyệt hạ rèn luyện S2.',
       detail: error.message,
