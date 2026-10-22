@@ -3,109 +3,71 @@ const Violation = require("../models/Violation");
 const Rule = require("../models/Rule");
 const createAuditLog = require("../utils/createAuditLog");
 const { updateStudentConductScore,} = require("./violationController");
+
 // ============================================================
-// 📋 LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
+// TÍNH NGÀY HẾT HIỆU LỰC THEO GIỜ VIỆT NAM
+// Hạn hiệu lực là trường riêng, không thay thế deadlineAt.
 // ============================================================
-
-const getVietnamDateParts = (date) => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-
-  const result = {};
-  for (const part of parts) {
-    if (part.type !== 'literal') {
-      result[part.type] = Number(part.value);
-    }
-  }
-
-  return {
-    year: result.year,
-    month: result.month,
-    day: result.day,
-  };
-};
-
-const calculateApplicationExpiry = (
-  submittedAt,
-  validityDuration,
-  customExpiryDate
-) => {
-  const duration = validityDuration || 'DAY';
-
-  const allowedDurations = [
-    'DAY',
-    '3_DAYS',
-    '7_DAYS',
-    '30_DAYS',
-    'CUSTOM',
-  ];
-
-  if (!allowedDurations.includes(duration)) {
+const calculateApplicationExpiry = ({
+  submittedAt = new Date(),
+  validityDuration = 'DAY',
+  customValidityDays,
+  customExpiryDate,
+} = {}) => {
+  const allowedDurations = ['DAY', '3_DAYS', '7_DAYS', 'CUSTOM_DAYS', 'CUSTOM_DATE'];
+  if (!allowedDurations.includes(validityDuration)) {
     throw new Error('Thời gian hiệu lực không hợp lệ.');
   }
 
-  const today = getVietnamDateParts(submittedAt);
-  let year = today.year;
-  let month = today.month;
-  let day = today.day;
+  // Lấy ngày lịch hiện tại theo múi giờ Việt Nam.
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(submittedAt);
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  let year = Number(part('year'));
+  let month = Number(part('month'));
+  let day = Number(part('day'));
 
-  if (duration === 'CUSTOM') {
-    if (
-      typeof customExpiryDate !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(customExpiryDate)
-    ) {
-      throw new Error('Vui lòng chọn ngày hết hiệu lực.');
+  if (validityDuration === 'CUSTOM_DATE') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(customExpiryDate || ''))) {
+      throw new Error('Vui lòng chọn ngày hết hiệu lực hợp lệ.');
     }
-
-    [year, month, day] = customExpiryDate
-      .split('-')
-      .map(Number);
-
-    const checkDate = new Date(Date.UTC(year, month - 1, day));
-
-    if (
-      checkDate.getUTCFullYear() !== year ||
-      checkDate.getUTCMonth() !== month - 1 ||
-      checkDate.getUTCDate() !== day
-    ) {
+    const [y, m, d] = customExpiryDate.split('-').map(Number);
+    const check = new Date(Date.UTC(y, m - 1, d));
+    if (check.getUTCFullYear() !== y || check.getUTCMonth() !== m - 1 || check.getUTCDate() !== d) {
       throw new Error('Ngày hết hiệu lực không hợp lệ.');
     }
-
-    const todayUtc = Date.UTC(
-      today.year,
-      today.month - 1,
-      today.day
-    );
-
-    if (checkDate.getTime() < todayUtc) {
-      throw new Error('Ngày hết hiệu lực không được trước ngày nộp đơn.');
+    const selectedDate = Date.UTC(y, m - 1, d);
+    const todayDate = Date.UTC(year, month - 1, day);
+    if (selectedDate < todayDate) {
+      throw new Error('Ngày hết hiệu lực không được ở trong quá khứ.');
     }
-  } else {
-    const durationDays = {
-      DAY: 1,
-      '3_DAYS': 3,
-      '7_DAYS': 7,
-      '30_DAYS': 30,
-    };
-
-    const endDate = new Date(
-      Date.UTC(year, month - 1, day + durationDays[duration] - 1)
-    );
-
-    year = endDate.getUTCFullYear();
-    month = endDate.getUTCMonth() + 1;
-    day = endDate.getUTCDate();
+    return new Date(Date.UTC(y, m - 1, d, 16, 59, 59, 999));
   }
 
-  // 23:59:59.999 theo giờ Việt Nam (UTC+7)
-  return new Date(
-    Date.UTC(year, month - 1, day, 16, 59, 59, 999)
-  );
+  let daysToAdd = 1;
+  if (validityDuration === '3_DAYS') daysToAdd = 3;
+  if (validityDuration === '7_DAYS') daysToAdd = 7;
+  if (validityDuration === 'CUSTOM_DAYS') {
+    daysToAdd = Number(customValidityDays);
+    if (!Number.isInteger(daysToAdd) || daysToAdd < 1 || daysToAdd > 365) {
+      throw new Error('Số ngày hiệu lực tùy chọn phải từ 1 đến 365 ngày.');
+    }
+  }
+
+  const expiryCalendarDate = new Date(Date.UTC(year, month - 1, day + daysToAdd));
+  return new Date(Date.UTC(
+    expiryCalendarDate.getUTCFullYear(),
+    expiryCalendarDate.getUTCMonth(),
+    expiryCalendarDate.getUTCDate(),
+    16, 59, 59, 999
+  ));
 };
+
+// ============================================================
+// 📋 LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
+// ============================================================
 
 exports.getEligibleViolations = async (req, res) => {
   try {
@@ -213,13 +175,14 @@ exports.getEligibleViolations = async (req, res) => {
 exports.createApplication = async (req, res) => {
   try {
     const {
-        violationId,
-        deadlineAt,
-        validityDuration = 'DAY',
-        customExpiryDate,
-        note = '',
-        isException = false,
-      } = req.body;
+      violationId,
+      deadlineAt,
+      note = '',
+      isException = false,
+      validityDuration = 'DAY',
+      customValidityDays,
+      customExpiryDate,
+    } = req.body;
 
     // --------------------------------------------------------
     // 1. Kiểm tra violationId
@@ -390,11 +353,7 @@ exports.createApplication = async (req, res) => {
     // --------------------------------------------------------
 
     const submittedAt = new Date();
-    const expiresAt = calculateApplicationExpiry(
-        submittedAt,
-        validityDuration,
-        customExpiryDate
-      );
+
     const startOfMonth = new Date(
       submittedAt.getFullYear(),
       submittedAt.getMonth(),
@@ -454,6 +413,13 @@ exports.createApplication = async (req, res) => {
     // 11. Tạo đơn
     // --------------------------------------------------------
 
+    const expiresAt = calculateApplicationExpiry({
+      submittedAt,
+      validityDuration,
+      customValidityDays,
+      customExpiryDate,
+    });
+
     const application =
       await LeaveApplication.create({
         violationId: violation._id,
@@ -466,7 +432,7 @@ exports.createApplication = async (req, res) => {
         ruleCode: rule.ruleCode,
         groupCode: normalizedGroupCode,
         description: rule.title,
-        
+
         originalPenalty: penalty,
 
         status: 'PENDING',
@@ -476,7 +442,7 @@ exports.createApplication = async (req, res) => {
         deadlineAt: deadlineAt
           ? new Date(deadlineAt)
           : null,
-        
+
         validityDuration,
         expiresAt,
         submissionNumber,
@@ -502,9 +468,10 @@ exports.createApplication = async (req, res) => {
       error
     );
 
-    return res.status(500).json({
+    const validationError = /thời gian hiệu lực|ngày hết hiệu lực|số ngày hiệu lực/i.test(String(error?.message || ''));
+    return res.status(validationError ? 400 : 500).json({
       success: false,
-      message: 'Không thể tạo đơn xin phép.',
+      message: validationError ? error.message : 'Không thể tạo đơn xin phép.',
       error: error.message,
     });
   }
@@ -531,6 +498,9 @@ exports.createDirectApplication = async (req, res) => {
       description,
       originalPenalty,
       note = '',
+      validityDuration = 'DAY',
+      customValidityDays,
+      customExpiryDate,
     } = req.body;
 
     // --------------------------------------------------------
@@ -638,6 +608,12 @@ exports.createDirectApplication = async (req, res) => {
 // --------------------------------------------------------
 
 const submittedAt = new Date();
+const expiresAt = calculateApplicationExpiry({
+  submittedAt,
+  validityDuration,
+  customValidityDays,
+  customExpiryDate,
+});
 
 const startOfMonth = new Date(
   submittedAt.getFullYear(),
@@ -692,6 +668,8 @@ const application = await LeaveApplication.create({
   status: 'PENDING',
 
   submittedAt,
+  validityDuration,
+  expiresAt,
 
   // 🔢 Lưu cố định thứ tự lần nộp
   submissionNumber,
@@ -709,9 +687,10 @@ const application = await LeaveApplication.create({
       error
     );
 
-    return res.status(500).json({
+    const validationError = /thời gian hiệu lực|ngày hết hiệu lực|số ngày hiệu lực/i.test(String(error?.message || ''));
+    return res.status(validationError ? 400 : 500).json({
       success: false,
-      message: 'Không thể tạo đơn xin phép trực tiếp.',
+      message: validationError ? error.message : 'Không thể tạo đơn xin phép trực tiếp.',
       error: error.message,
     });
   }
