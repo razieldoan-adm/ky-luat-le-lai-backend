@@ -2,7 +2,7 @@ const Violation = require('../models/Violation');
 const Rule = require('../models/Rule');
 const Setting = require('../models/Setting');
 const StudentConductScore = require('../models/StudentConductScore');
-
+const LeaveApplication = require('../models/LeaveApplication');
 const createAuditLog = require("../utils/createAuditLog");
 const sharp = require("sharp");
 
@@ -591,6 +591,7 @@ exports.createViolation = async (req, res) => {
       weekNumber,
       time,
       name: rawName,
+      leaveApplicationId,
     } = req.body;
 
     // ========================================================
@@ -633,14 +634,49 @@ exports.createViolation = async (req, res) => {
       });
     }
 
-    const name =
-      normalizeName(rawName);
+    const name = normalizeName(rawName);
 
-    const normalizedClass =
-      normalizeClass(className);
+    const normalizedClass = normalizeClass(className);
 
-    const week =
-      Number(weekNumber);
+    const week = Number(weekNumber);
+    
+    // Nếu người dùng chọn gắn đơn, xác thực lại ở backend
+    // trước khi tạo vi phạm.
+    let leaveApplication = null;
+
+    if (leaveApplicationId) {
+      leaveApplication = await LeaveApplication.findOne({
+        _id: leaveApplicationId,
+        status: "PENDING",
+        expiresAt: { $gt: new Date() },
+        $or: [
+          { violationId: { $exists: false } },
+          { violationId: null },
+        ],
+      });
+
+      const same = (a, b) =>
+        String(a || "").trim().toLocaleLowerCase() ===
+        String(b || "").trim().toLocaleLowerCase();
+
+      if (
+        !leaveApplication ||
+        !same(leaveApplication.studentName, name) ||
+        !same(leaveApplication.className, normalizedClass) ||
+        !same(
+          leaveApplication.academicYear,
+          String(academicYear).trim()
+        ) ||
+        Number(leaveApplication.weekNumber) !== week ||
+        String(leaveApplication.ruleCode || "").trim().toUpperCase() !==
+          String(ruleCode || "").trim().toUpperCase()
+      ) {
+        return res.status(400).json({
+          error:
+            "Đơn xin phép không còn hiệu lực hoặc không khớp với học sinh/lỗi đang ghi nhận.",
+        });
+      }
+    }
 
     // ========================================================
     // TÌM RULE
@@ -702,6 +738,13 @@ exports.createViolation = async (req, res) => {
       });
 
     await violation.save();
+    
+    // Liên kết đơn với lỗi vừa tạo.
+    // Giữ nguyên trạng thái PENDING để quy trình xử lý đơn hiện tại tiếp tục hoạt động.
+    if (leaveApplication) {
+      leaveApplication.violationId = violation._id;
+      await leaveApplication.save();
+    }
 
     // S2 không được tạo tự động khi ghi nhận vi phạm.
     // Việc tạo S2 chỉ xảy ra sau khi người dùng xác nhận duyệt.
@@ -1568,7 +1611,7 @@ exports.approveWeeklyS2Review = async (req, res) => {
     const normalizedClass = normalizeClass(className);
     const year = String(academicYear || '').trim();
     const week = Number(weekNumber);
-
+    
     if (!normalizedName || !normalizedClass || !year || !Number.isInteger(week) || week < 1) {
       return res.status(400).json({
         message: 'Thiếu hoặc sai thông tin học sinh, lớp, năm học hoặc tuần.',
