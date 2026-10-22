@@ -117,10 +117,28 @@ const leaveApplicationSchema = new mongoose.Schema(
       default: null,
     },
     
+    
+    // ==========================================
+    // THỜI GIAN HIỆU LỰC ĐƠN
+    // ==========================================
+
     validityDuration: {
       type: String,
-      enum: ['DAY', '3_DAYS', '7_DAYS', '30_DAYS', 'CUSTOM'],
+      enum: [
+        'DAY',
+        '3_DAYS',
+        '7_DAYS',
+        'CUSTOM_DAYS',
+        'CUSTOM_DATE',
+      ],
       default: 'DAY',
+    },
+
+    // Số ngày tùy chọn khi validityDuration = CUSTOM_DAYS
+    customValidityDays: {
+      type: Number,
+      min: 1,
+      default: null,
     },
 
     // Thời điểm đơn hết hiệu lực
@@ -130,6 +148,7 @@ const leaveApplicationSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+
     // ==========================================
     // NGƯỜI XỬ LÝ
     // ==========================================
@@ -156,6 +175,7 @@ const leaveApplicationSchema = new mongoose.Schema(
     type: Number,
     default: 1,
   },
+    
   },
   {
     timestamps: true,
