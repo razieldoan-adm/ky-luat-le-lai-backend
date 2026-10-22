@@ -122,32 +122,35 @@ const leaveApplicationSchema = new mongoose.Schema(
     // THỜI GIAN HIỆU LỰC ĐƠN
     // ==========================================
 
-    validityDuration: {
-      type: String,
-      enum: [
-        'DAY',
-        '3_DAYS',
-        '7_DAYS',
-        'CUSTOM_DAYS',
-        'CUSTOM_DATE',
-      ],
-      default: 'DAY',
-    },
+    
+      validityDuration: {
+        type: String,
+        enum: [
+          'DAY',
+          '3_DAYS',
+          '7_DAYS',
+          'CUSTOM_DAYS',
+          'CUSTOM_DATE',
+        ],
+        default: 'DAY',
+      },
+      
+      // Số ngày tùy chọn, chỉ sử dụng khi validityDuration = CUSTOM_DAYS
+      customValidityDays: {
+        type: Number,
+        min: 1,
+        max: 365,
+        default: null,
+      },
+      
+      // Thời điểm đơn hết hiệu lực
+      // Khác với deadlineAt (hạn xử lý đơn)
+      expiresAt: {
+        type: Date,
+        default: null,
+        index: true,
+      },
 
-    // Số ngày tùy chọn khi validityDuration = CUSTOM_DAYS
-    customValidityDays: {
-      type: Number,
-      min: 1,
-      default: null,
-    },
-
-    // Thời điểm đơn hết hiệu lực
-    // Khác với deadlineAt (hạn xử lý đơn)
-    expiresAt: {
-      type: Date,
-      default: null,
-      index: true,
-    },
 
     // ==========================================
     // NGƯỜI XỬ LÝ
