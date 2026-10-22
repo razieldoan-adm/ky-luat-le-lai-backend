@@ -444,6 +444,10 @@ exports.createApplication = async (req, res) => {
           : null,
 
         validityDuration,
+        customValidityDays:
+          validityDuration === 'CUSTOM_DAYS'
+            ? Number(customValidityDays)
+            : null,
         expiresAt,
         submissionNumber,
 
@@ -669,6 +673,10 @@ const application = await LeaveApplication.create({
 
   submittedAt,
   validityDuration,
+  customValidityDays:
+    validityDuration === 'CUSTOM_DAYS'
+      ? Number(customValidityDays)
+      : null,
   expiresAt,
 
   // 🔢 Lưu cố định thứ tự lần nộp
