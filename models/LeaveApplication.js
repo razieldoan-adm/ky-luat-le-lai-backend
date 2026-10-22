@@ -117,6 +117,19 @@ const leaveApplicationSchema = new mongoose.Schema(
       default: null,
     },
     
+    validityDuration: {
+      type: String,
+      enum: ['DAY', '3_DAYS', '7_DAYS', '30_DAYS', 'CUSTOM'],
+      default: 'DAY',
+    },
+
+    // Thời điểm đơn hết hiệu lực
+    // Khác với deadlineAt (hạn xử lý đơn)
+    expiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     // ==========================================
     // NGƯỜI XỬ LÝ
     // ==========================================
