@@ -7,6 +7,106 @@ const { updateStudentConductScore,} = require("./violationController");
 // 📋 LẤY DANH SÁCH VI PHẠM CÓ THỂ NỘP ĐƠN
 // ============================================================
 
+const getVietnamDateParts = (date) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const result = {};
+  for (const part of parts) {
+    if (part.type !== 'literal') {
+      result[part.type] = Number(part.value);
+    }
+  }
+
+  return {
+    year: result.year,
+    month: result.month,
+    day: result.day,
+  };
+};
+
+const calculateApplicationExpiry = (
+  submittedAt,
+  validityDuration,
+  customExpiryDate
+) => {
+  const duration = validityDuration || 'DAY';
+
+  const allowedDurations = [
+    'DAY',
+    '3_DAYS',
+    '7_DAYS',
+    '30_DAYS',
+    'CUSTOM',
+  ];
+
+  if (!allowedDurations.includes(duration)) {
+    throw new Error('Thời gian hiệu lực không hợp lệ.');
+  }
+
+  const today = getVietnamDateParts(submittedAt);
+  let year = today.year;
+  let month = today.month;
+  let day = today.day;
+
+  if (duration === 'CUSTOM') {
+    if (
+      typeof customExpiryDate !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(customExpiryDate)
+    ) {
+      throw new Error('Vui lòng chọn ngày hết hiệu lực.');
+    }
+
+    [year, month, day] = customExpiryDate
+      .split('-')
+      .map(Number);
+
+    const checkDate = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      checkDate.getUTCFullYear() !== year ||
+      checkDate.getUTCMonth() !== month - 1 ||
+      checkDate.getUTCDate() !== day
+    ) {
+      throw new Error('Ngày hết hiệu lực không hợp lệ.');
+    }
+
+    const todayUtc = Date.UTC(
+      today.year,
+      today.month - 1,
+      today.day
+    );
+
+    if (checkDate.getTime() < todayUtc) {
+      throw new Error('Ngày hết hiệu lực không được trước ngày nộp đơn.');
+    }
+  } else {
+    const durationDays = {
+      DAY: 1,
+      '3_DAYS': 3,
+      '7_DAYS': 7,
+      '30_DAYS': 30,
+    };
+
+    const endDate = new Date(
+      Date.UTC(year, month - 1, day + durationDays[duration] - 1)
+    );
+
+    year = endDate.getUTCFullYear();
+    month = endDate.getUTCMonth() + 1;
+    day = endDate.getUTCDate();
+  }
+
+  // 23:59:59.999 theo giờ Việt Nam (UTC+7)
+  return new Date(
+    Date.UTC(year, month - 1, day, 16, 59, 59, 999)
+  );
+};
+
 exports.getEligibleViolations = async (req, res) => {
   try {
     const {
@@ -113,11 +213,13 @@ exports.getEligibleViolations = async (req, res) => {
 exports.createApplication = async (req, res) => {
   try {
     const {
-      violationId,
-      deadlineAt,
-      note = '',
-      isException = false,
-    } = req.body;
+        violationId,
+        deadlineAt,
+        validityDuration = 'DAY',
+        customExpiryDate,
+        note = '',
+        isException = false,
+      } = req.body;
 
     // --------------------------------------------------------
     // 1. Kiểm tra violationId
@@ -288,7 +390,11 @@ exports.createApplication = async (req, res) => {
     // --------------------------------------------------------
 
     const submittedAt = new Date();
-
+    const expiresAt = calculateApplicationExpiry(
+        submittedAt,
+        validityDuration,
+        customExpiryDate
+      );
     const startOfMonth = new Date(
       submittedAt.getFullYear(),
       submittedAt.getMonth(),
@@ -360,7 +466,7 @@ exports.createApplication = async (req, res) => {
         ruleCode: rule.ruleCode,
         groupCode: normalizedGroupCode,
         description: rule.title,
-
+        
         originalPenalty: penalty,
 
         status: 'PENDING',
@@ -370,7 +476,9 @@ exports.createApplication = async (req, res) => {
         deadlineAt: deadlineAt
           ? new Date(deadlineAt)
           : null,
-
+        
+        validityDuration,
+        expiresAt,
         submissionNumber,
 
         isException: Boolean(isException),
