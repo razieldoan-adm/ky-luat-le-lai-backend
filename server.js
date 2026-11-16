@@ -37,6 +37,8 @@ const userRoutes = require('./routes/userRoutes');
 const leaveApplicationRoutes = require('./routes/leaveApplicationRoutes');
 const directLeaveRuleSettingRoutes = require('./routes/directLeaveRuleSettingRoutes');
 
+const studentNoteRoutes = require('./routes/studentNoteRoutes');
+const studentNoteTemplateRoutes = require('./routes/studentNoteTemplateRoutes');
 
 dotenv.config();
 
@@ -73,6 +75,8 @@ app.use('/api/class-lineup-summaries', classLineUpSummaryRoutes);
 app.use('/api/class-weekly-scores', classWeeklyScoreRoutes);
 app.use('/api/class-rank', emulationRoutes);
 app.use('/api/students',studentRoutes);
+app.use('/api/student-notes', studentNoteRoutes);
+app.use('/api/student-note-templates', studentNoteTemplateRoutes);
 app.use("/api/early-leave/students", earlyLeaveStudentRoutes);
 app.use('/api/student-conduct-scores', studentConductScoreRoutes);
 app.use("/api/student-monthly-conduct", studentMonthlyConductRoutes);
